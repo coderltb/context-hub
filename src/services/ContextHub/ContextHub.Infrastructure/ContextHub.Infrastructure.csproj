@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\shared\ContextHub.Cache\ContextHub.Cache.csproj" />
+      <ProjectReference Include="..\..\..\shared\ContextHub.Core\ContextHub.Core.csproj" />
+      <ProjectReference Include="..\ContextHub.Application\ContextHub.Application.csproj" />
+      <ProjectReference Include="..\ContextHub.Domain\ContextHub.Domain.csproj" />
+    </ItemGroup>
+
+</Project>
