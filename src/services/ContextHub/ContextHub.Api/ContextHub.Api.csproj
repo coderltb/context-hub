@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\..\shared\ContextHub.ApiCommon\ContextHub.ApiCommon.csproj" />
+      <ProjectReference Include="..\..\..\shared\ContextHub.Observability\ContextHub.Observability.csproj" />
+      <ProjectReference Include="..\ContextHub.Infrastructure\ContextHub.Infrastructure.csproj" />
+    </ItemGroup>
+
+</Project>
