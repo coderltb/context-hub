@@ -94,35 +94,6 @@ public static class HttpClientServiceRegistration
         services.AddHttpClientInfrastructure(name, configure, configureResilience).AddTypedClient<TClient, TImplementation>();
 
     /// <summary>
-    /// Attaches one native resilience pipeline to the selected client, never to all clients globally.
-    /// </summary>
-    /// <param name="builder">The explicitly selected named or typed client.</param>
-    /// <param name="configure">Optional service-owned timeout and safe-retry tuning.</param>
-    /// <returns>The same builder for host composition.</returns>
-    public static IHttpClientBuilder AddHttpResilience(
-        this IHttpClientBuilder builder,
-        Action<HttpStandardResilienceOptions>? configure = null)
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-
-        // The native total timeout owns the clock; a second HttpClient timeout obscures its cancellation source.
-        builder.ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan);
-
-        builder.AddStandardResilienceHandler(options =>
-        {
-            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
-            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
-            options.Retry.MaxRetryAttempts = 3;
-            configure?.Invoke(options);
-
-            // Apply this guard last so custom tuning cannot replay mutations, including an MCP POST.
-            options.Retry.DisableForUnsafeHttpMethods();
-        });
-
-        return builder;
-    }
-
-    /// <summary>
     /// Registers the correlation handler for named clients that explicitly add it to their pipeline.
     /// </summary>
     /// <param name="services">The host service collection.</param>

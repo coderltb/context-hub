@@ -49,16 +49,6 @@ public static class CoreLogConstants
     public static class HttpLogs
     {
         /// <summary>
-        /// Reports transport cancellation without exposing the URL or synthesizing a response.
-        /// </summary>
-        public const string SEND_CANCELLED = "HTTP transport cancelled; Client={ClientName}, Method={Method}.";
-
-        /// <summary>
-        /// Reports transport failure type without its credential-bearing exception message.
-        /// </summary>
-        public const string SEND_FAILED = "HTTP transport failed; Client={ClientName}, Method={Method}, FailureType={FailureType}.";
-
-        /// <summary>
         /// Marks the outbound boundary using only the HTTP method.
         /// </summary>
         public const string SEND_STARTED = "HTTP send started; Method={Method}.";
@@ -77,16 +67,6 @@ public static class CoreLogConstants
         /// Records the serialized integration request after masking credential fields.
         /// </summary>
         public const string PROVIDER_STARTED = "Third-party call started; RequestType={RequestType}, MaskedRequest={MaskedRequest}.";
-
-        /// <summary>
-        /// Identifies cancellation after headers without disclosing provider body or exception text.
-        /// </summary>
-        public const string BODY_READ_CANCELLED = "Third-party body read cancelled; RequestType={RequestType}, StatusCode={StatusCode}.";
-
-        /// <summary>
-        /// Reports a body consumption failure separately from an upstream HTTP status failure.
-        /// </summary>
-        public const string BODY_READ_FAILED = "Third-party body read failed; RequestType={RequestType}, StatusCode={StatusCode}, FailureType={FailureType}.";
 
         /// <summary>
         /// Reports an upstream HTTP failure without exposing unmasked response content or its reason phrase.
@@ -147,6 +127,18 @@ public static class CoreLogConstants
     /// </summary>
     public static class TransactionLogs
     {
+        /// <summary>
+        /// Identifies the original owned operation before rollback or disposal can fail independently.
+        /// </summary>
+        public const string OPERATION_FAILED =
+            "Unit-of-work {Operation} failed; DbContextType={DbContextType}, TransactionId={TransactionId}, FailureType={FailureType}.";
+
+        /// <summary>
+        /// Reports an isolation mismatch without exposing commands, entities or connection information.
+        /// </summary>
+        public const string ISOLATION_CONFLICT =
+            "Transaction isolation rejected for database context {DbContextType}; Required={RequiredIsolation}, Actual={ActualIsolation}.";
+
         /// <summary>
         /// Records secondary disposal failure without exposing provider details or replacing the original error.
         /// </summary>
@@ -223,5 +215,26 @@ public static class CoreLogConstants
         /// Logged after an operation stages changes without saving.
         /// </summary>
         public const string CHANGE_STAGED = "Repository {Operation} staged for entity type {EntityType}; no save performed.";
+    }
+
+    /// <summary>
+    /// Records mail-provider outcomes without recipients, content or provider response bodies.
+    /// </summary>
+    public static class EmailLogs
+    {
+        /// <summary>
+        /// Reports provider acceptance without implying inbox delivery.
+        /// </summary>
+        public const string ACCEPTED = "Email provider accepted transactional message with status {StatusCode}";
+
+        /// <summary>
+        /// Records only provider status, never its body or the recipient.
+        /// </summary>
+        public const string REJECTED = "Email provider rejected transactional message with status {StatusCode}";
+
+        /// <summary>
+        /// Reports the safe transport classification without message content or credentials.
+        /// </summary>
+        public const string TRANSPORT_FAILED = "Transactional email transport failed with {FailureType}";
     }
 }

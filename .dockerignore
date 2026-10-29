@@ -1,0 +1,31 @@
+# Keep local state and build output outside the build context.
+**/.git
+**/.vs
+**/.idea
+**/.vscode
+**/.ai-team
+**/.codex
+**/bin
+**/obj
+**/TestResults
+**/test-results
+**/coverage
+**/node_modules
+**/*.user
+**/*.suo
+**/*.log
+# Local configuration and credentials never enter an image layer.
+**/appsettings.*.json
+!**/appsettings.Production.json
+**/.env
+**/.env.*
+**/secrets.json
+**/.secrets
+**/*.pem
+**/*.key
+**/*.pfx
+**/*.p12
+**/.aspnet
+# Authentication builds its own project graph; other hosts and tests are not inputs.
+src/tests
+src/services/ContextHub

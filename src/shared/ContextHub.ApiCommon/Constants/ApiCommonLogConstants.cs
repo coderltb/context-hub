@@ -6,6 +6,27 @@ namespace ContextHub.ApiCommon.Constants;
 public static class ApiCommonLogConstants
 {
     /// <summary>
+    /// Records redacted MVC DTO diagnostics separately from native HTTP completion and business events.
+    /// </summary>
+    public static class PayloadLogs
+    {
+        /// <summary>
+        /// Records bound arguments only after redaction or an explicit metadata-only omission.
+        /// </summary>
+        public const string REQUEST_RECEIVED = "API request received by {Action}; payload {RequestPayload}; omitted {PayloadOmittedReason}; content length {ContentLength}.";
+
+        /// <summary>
+        /// Records the executed response and final status after all inner response adapters completed.
+        /// </summary>
+        public const string RESPONSE_PRODUCED = "API response produced by {Action}; status {StatusCode}; payload {ResponsePayload}; omitted {PayloadOmittedReason}.";
+
+        /// <summary>
+        /// Records a diagnostic serializer failure without exception messages or the rejected object.
+        /// </summary>
+        public const string SERIALIZATION_FAILED = "API diagnostic serialization failed with {ExceptionType}; payload omitted.";
+    }
+
+    /// <summary>
     /// Current-user boundary metadata without subject identifiers or claim values.
     /// </summary>
     public static class AuthenticationLogs

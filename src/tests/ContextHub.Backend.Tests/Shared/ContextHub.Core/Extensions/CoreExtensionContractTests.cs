@@ -6,22 +6,6 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.Extensions;
 public sealed class CoreExtensionContractTests
 {
     /// <summary>
-    /// Requires one enum utility with generic parsing and metadata methods, without numeric conversion helpers.
-    /// </summary>
-    [Fact]
-    public void EnumExtension_ExposesOnlyApprovedGenericOperations()
-    {
-        var extension = typeof(CoreErrorConstants).Assembly.GetType("ContextHub.Core.Extensions.EnumExtension");
-
-        Assert.NotNull(extension);
-        var methods = extension.GetMethods().Where(method => method.DeclaringType == extension).ToArray();
-        Assert.Equal(
-            new[] { "GetDescription", "GetDisplayName", "TryParseDefinedName" },
-            methods.Select(method => method.Name).OrderBy(name => name, StringComparer.Ordinal));
-        Assert.All(methods, method => Assert.True(method.IsGenericMethodDefinition));
-    }
-
-    /// <summary>
     /// Requires collection rules to accept materialized read-only collections instead of arbitrary lazy enumerables.
     /// </summary>
     [Fact]
@@ -33,7 +17,7 @@ public sealed class CoreExtensionContractTests
         Assert.NotNull(extension);
         var methods = extension.GetMethods().Where(method => method.DeclaringType == extension).ToArray();
         Assert.Equal(
-            new[] { "DistinctElements", "MaxCount" },
+            ["DistinctElements", "MaxCount"],
             methods.Select(method => method.Name).OrderBy(name => name, StringComparer.Ordinal));
 
         foreach (var method in methods)

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -7,6 +7,8 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <!-- Analysis-only contracts are omitted from compiled assemblies and runtime dependencies. -->
+        <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" IncludeAssets="compile;build;analyzers" />
         <ProjectReference Include="..\ContextHub.Shared\ContextHub.Shared.csproj" />
     </ItemGroup>
 

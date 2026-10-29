@@ -11,11 +11,6 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// Bounds synchronization memory independently of the number of keys.
-    /// </summary>
-    private readonly object[] _stripes = Enumerable.Range(0, CacheConstants.AtomicVariables.STRIPE_COUNT).Select(_ => new object()).ToArray();
-
-    /// <summary>
     /// Schedules occasional cleanup without creating timers or background services.
     /// </summary>
     private long _operations;
@@ -59,15 +54,18 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
         cancellationToken.ThrowIfCancellationRequested();
 
         SweepExpiredEntries();
-        lock (GetStripe(key))
+        cancellationToken.ThrowIfCancellationRequested();
+        var proposed = new Entry(value, _clock.GetUtcNow().Add(expiration));
+        var stored = _entries.AddOrUpdate(key, proposed, (_, current) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            RemoveExpiredEntry(key);
-            var created = _entries.TryAdd(key, new Entry(value, _clock.GetUtcNow().Add(expiration)));
-            _logger.LogDebug(CacheLogConstants.AtomicLogs.COMPLETED, nameof(TrySetIfAbsentAsync));
 
-            return Task.FromResult(created);
-        }
+            // Only an absent or expired snapshot can install this reservation.
+            return current.ExpiresAt <= _clock.GetUtcNow() ? proposed : current;
+        });
+        _logger.LogDebug(CacheLogConstants.AtomicLogs.COMPLETED, nameof(TrySetIfAbsentAsync));
+
+        return Task.FromResult(ReferenceEquals(stored, proposed));
     }
 
     /// <summary>
@@ -83,20 +81,33 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
         cancellationToken.ThrowIfCancellationRequested();
 
         SweepExpiredEntries();
-        lock (GetStripe(key))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            RemoveExpiredEntry(key);
+        cancellationToken.ThrowIfCancellationRequested();
 
-            // Match Redis fixed-window semantics and reject nonnumeric or overflowing counters without changing state.
-            var exists = _entries.TryGetValue(key, out var previous);
-            var count = exists ? checked(long.Parse(previous!.Value, CultureInfo.InvariantCulture) + 1) : 1;
-            _entries[key] = new Entry(count.ToString(CultureInfo.InvariantCulture),
-                exists ? previous!.ExpiresAt : _clock.GetUtcNow().Add(expiration));
-            _logger.LogDebug(CacheLogConstants.AtomicLogs.COMPLETED, nameof(IncrementAsync));
+        // Native update callbacks may replay; they only construct immutable snapshots.
+        var stored = _entries.AddOrUpdate(key,
+            _ =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
 
-            return Task.FromResult(count);
-        }
+                return new Entry("1", _clock.GetUtcNow().Add(expiration));
+            },
+            (_, current) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var now = _clock.GetUtcNow();
+                if (current.ExpiresAt <= now)
+                {
+                    return new Entry("1", now.Add(expiration));
+                }
+
+                // Invalid or overflowing counters fail before native replacement and retain their original TTL.
+                var count = checked(long.Parse(current.Value, CultureInfo.InvariantCulture) + 1);
+
+                return new Entry(count.ToString(CultureInfo.InvariantCulture), current.ExpiresAt);
+            });
+        _logger.LogDebug(CacheLogConstants.AtomicLogs.COMPLETED, nameof(IncrementAsync));
+
+        return Task.FromResult(long.Parse(stored.Value, CultureInfo.InvariantCulture));
     }
 
     /// <summary>
@@ -111,34 +122,11 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
         cancellationToken.ThrowIfCancellationRequested();
 
         SweepExpiredEntries();
-        lock (GetStripe(key))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            _entries.TryRemove(key, out _);
-            _logger.LogDebug(CacheLogConstants.AtomicLogs.COMPLETED, nameof(RemoveAsync));
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        _entries.TryRemove(key, out _);
+        _logger.LogDebug(CacheLogConstants.AtomicLogs.COMPLETED, nameof(RemoveAsync));
 
         return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Resolves a stable, bounded synchronization stripe for a key.
-    /// </summary>
-    /// <param name="key">The validated key.</param>
-    /// <returns>The process-local synchronization object.</returns>
-    private object GetStripe(string key) =>
-        _stripes[(uint)StringComparer.Ordinal.GetHashCode(key) % (uint)_stripes.Length];
-
-    /// <summary>
-    /// Deletes only the expired snapshot that was observed, not a concurrently replaced entry.
-    /// </summary>
-    /// <param name="key">The key being inspected under its stripe.</param>
-    private void RemoveExpiredEntry(string key)
-    {
-        if (_entries.TryGetValue(key, out var entry) && entry.ExpiresAt <= _clock.GetUtcNow())
-        {
-            _entries.TryRemove(new KeyValuePair<string, Entry>(key, entry));
-        }
     }
 
     /// <summary>

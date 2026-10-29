@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>@ViewData["Title"] — Authentication</title>
+    <link rel="icon" type="image/svg+xml" href="~/favicon.svg" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/sso.css" asp-append-version="true" />
+</head>
+<body>
+<div class="sso-shell">
+    <main class="sso-card">
+        <header class="sso-header">
+            <a class="sso-brand" href="@AuthenticationConstants.Endpoints.HOME_PAGE">Authentication</a>
+        </header>
+
+        @RenderBody()
+    </main>
+</div>
+</body>
+</html>

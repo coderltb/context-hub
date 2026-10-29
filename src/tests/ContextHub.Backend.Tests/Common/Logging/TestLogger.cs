@@ -22,8 +22,8 @@ internal sealed class TestLogger<TCategory> : ILogger<TCategory>
     /// <typeparam name="TState">The structured logging state type.</typeparam>
     /// <param name="state">The structured logging state passed through the logger contract.</param>
     /// <returns>A no-op scope used by this test logger.</returns>
-    public IDisposable? BeginScope<TState>(TState state)
-        where TState : notnull => NullScope.Instance;
+    public IDisposable BeginScope<TState>(TState state)
+        where TState : notnull => NullLogger.Instance.BeginScope(state);
 
     /// <summary>
     /// Enables every level so tests can assert the intended severity.
@@ -57,21 +57,4 @@ internal sealed class TestLogger<TCategory> : ILogger<TCategory>
     /// <param name="Exception">The optional logged exception.</param>
     internal sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);
 
-    /// <summary>
-    /// Provides a reusable no-op scope for the capturing test logger.
-    /// </summary>
-    private sealed class NullScope : IDisposable
-    {
-        /// <summary>
-        /// Gets the reusable scope used when tests do not inspect logging scopes.
-        /// </summary>
-        public static NullScope Instance { get; } = new();
-
-        /// <summary>
-        /// Completes the no-op logging scope without owning external resources.
-        /// </summary>
-        public void Dispose()
-        {
-        }
-    }
 }

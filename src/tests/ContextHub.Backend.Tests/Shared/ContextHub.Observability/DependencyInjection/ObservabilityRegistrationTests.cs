@@ -91,12 +91,14 @@ public sealed class ObservabilityRegistrationTests
         var exporter = new CapturingExporter();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseKestrel().UseUrls("http://127.0.0.1:0");
+        builder.Services.AddHttpClient();
         builder.Services.AddTelemetry(configuration, "TestService")
             .WithTracing(tracing => tracing.AddProcessor(new SimpleActivityExportProcessor(exporter)));
         await using var app = builder.Build();
         app.Run(_ => Task.CompletedTask);
         await app.StartAsync();
-        using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
+        using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient();
+        client.BaseAddress = new Uri(app.Urls.Single());
 
         var paths = excludedFirst ? new[] { "/health/ready", "/healthy" } : ["/healthy", "/health/ready"];
         foreach (var path in paths)
@@ -135,6 +137,28 @@ public sealed class ObservabilityRegistrationTests
     }
 
     /// <summary>
+    /// Binds the existing appsettings names to the closed rendering selection without changing console-mode behavior.
+    /// </summary>
+    /// <param name="configured">The public configuration value used by appsettings or environment overrides.</param>
+    /// <param name="expected">The corresponding typed rendering selection.</param>
+    [Theory]
+    [InlineData("CompactJson", ConsoleLogFormat.CompactJson)]
+    [InlineData("Text", ConsoleLogFormat.Text)]
+    [InlineData("Both", ConsoleLogFormat.Both)]
+    public void Logging_ConsoleFormat_BindsSupportedNames(string configured, ConsoleLogFormat expected)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Observability:Logging:ConsoleFormat"] = configured
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddLoggingInfrastructure(configuration, "TestService", "Test");
+        using var provider = services.BuildServiceProvider();
+
+        Assert.Equal(expected, provider.GetRequiredService<IOptions<LoggingOptions>>().Value.ConsoleFormat);
+    }
+
+    /// <summary>
     /// Rejects invalid format configuration when the host resolves its logging services.
     /// </summary>
     [Fact]
@@ -148,7 +172,8 @@ public sealed class ObservabilityRegistrationTests
         services.AddLoggingInfrastructure(configuration, "TestService", "Test");
         using var provider = services.BuildServiceProvider();
 
-        Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<LoggingOptions>>().Value);
+        // Unknown names fail native enum binding; no custom parser or exception wrapper is needed.
+        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IOptions<LoggingOptions>>().Value);
     }
 
     /// <summary>

@@ -21,15 +21,22 @@ internal sealed class ApiHostProcess : IAsyncDisposable
     private readonly Task<string> _error;
 
     /// <summary>
+    /// Identifies a real anonymous route of this host, without retaining a generated sample endpoint.
+    /// </summary>
+    private readonly string _readyPath;
+
+    /// <summary>
     /// Retains the HTTP client and asynchronous pipe readers for one child host.
     /// </summary>
     /// <param name="process">The child API process owned by this test fixture.</param>
     /// <param name="address">The local HTTP address exposed by the spawned API host.</param>
-    private ApiHostProcess(Process process, Uri address)
+    /// <param name="readyPath">The host's anonymous readiness request path.</param>
+    private ApiHostProcess(Process process, Uri address, string readyPath)
     {
         _process = process;
         _output = process.StandardOutput.ReadToEndAsync();
         _error = process.StandardError.ReadToEndAsync();
+        _readyPath = readyPath;
         Client = new HttpClient { BaseAddress = address, Timeout = TimeSpan.FromSeconds(2) };
     }
 
@@ -56,7 +63,7 @@ internal sealed class ApiHostProcess : IAsyncDisposable
 
         Assert.NotNull(root);
         var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
-        var project = Path.Combine(root!.FullName, "src", "services", service, application);
+        var project = Path.Combine(root.FullName, "src", "services", service, application);
         var assembly = Path.Combine(project, "bin", configuration, "net10.0", $"{application}.dll");
         Assert.True(File.Exists(assembly), "Build the API projects before running host smoke tests.");
 
@@ -84,11 +91,20 @@ internal sealed class ApiHostProcess : IAsyncDisposable
             start.Environment["Observability__Logging__ConsoleFormat"] = format;
         }
 
-        return new ApiHostProcess(Process.Start(start)!, address);
+        if (service == "Authentication")
+        {
+            // The child host receives only test-owned keys, independently of local credential files.
+            foreach (var entry in AuthenticationTestKeys.Create())
+            {
+                start.Environment[entry.Key.Replace(":", "__", StringComparison.Ordinal)] = entry.Value;
+            }
+        }
+
+        return new ApiHostProcess(Process.Start(start)!, address, "/health/live");
     }
 
     /// <summary>
-    /// Waits for the preserved scaffold route rather than relying on a particular startup log message.
+    /// Waits for a real anonymous route rather than relying on a particular startup log message.
     /// </summary>
     /// <returns>A task that completes when the spawned host responds, or faults if startup fails.</returns>
     public async Task WaitUntilReadyAsync()
@@ -99,7 +115,7 @@ internal sealed class ApiHostProcess : IAsyncDisposable
             Assert.False(_process.HasExited, "The API host exited before accepting a request.");
             try
             {
-                using var response = await Client.GetAsync("/weatherforecast");
+                using var response = await Client.GetAsync(_readyPath);
                 if (response.IsSuccessStatusCode)
                 {
                     return;

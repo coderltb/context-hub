@@ -153,8 +153,8 @@ public sealed class ApiBoundaryTests
         var http = new DefaultHttpContext();
         http.Features.Set<IHttpResponseFeature>(new StartedResponseFeature());
         http.Request.Path = "/api/reports/missing";
-        var action = new ActionContext(http, new Microsoft.AspNetCore.Routing.RouteData(),
-            new Microsoft.AspNetCore.Mvc.Abstractions.ActionDescriptor());
+        var action = new ActionContext(http, new RouteData(),
+            new ActionDescriptor());
         var result = new NotFoundResult();
         var executing = new ResultExecutingContext(action, [], result, new object());
         var factory = new ApiErrorResponseFactory(new ApiResponseMetadataFactory(TimeProvider.System, boundary));
@@ -192,9 +192,10 @@ public sealed class ApiBoundaryTests
         builder.Services.AddApiInfrastructure(prefix, version);
         builder.Services.AddLoggingInfrastructure(new ConfigurationBuilder().Build(), "boundary-fixture", "Test");
         builder.Services.AddAuthentication("fixture").AddScheme<AuthenticationSchemeOptions,
-            global::ContextHub.Backend.Tests.Shared.ContextHub.ApiCommon.DependencyInjection.OpenApiRegistrationTests.FixtureAuthenticationHandler>(
+            DependencyInjection.OpenApiRegistrationTests.FixtureAuthenticationHandler>(
                 "fixture", _ => { });
         builder.Services.AddAuthorization(options => options.AddPolicy("permission", policy => policy.RequireClaim("permission")));
+        builder.Services.AddOpenApi();
         builder.Services.AddOpenApiInfrastructure(registration => registration.ApiErrorResponses());
 
         var app = builder.Build();
@@ -209,7 +210,7 @@ public sealed class ApiBoundaryTests
         app.MapGet(prefix + "/protected", () => TypedResults.Ok("allowed")).RequireAuthorization("permission");
         app.MapGet(prefix + "/body", () => Results.Text("unchanged", statusCode: 404));
         app.MapGet(prefix + "/file", () => Results.File(Encoding.UTF8.GetBytes("file-payload"), "application/octet-stream"));
-        app.MapGet(prefix + "/failure", (HttpContext _) => throw new InvalidOperationException("private-failure"));
+        app.MapGet(prefix + "/failure", _ => throw new InvalidOperationException("private-failure"));
         app.MapFallback(context =>
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;

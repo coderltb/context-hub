@@ -1,0 +1,28 @@
+@page
+@model AcceptInvitationModel
+@{
+    ViewData["Title"] = "Set account password";
+}
+<h1>Set account password</h1>
+
+<form class="sso-form" method="post">
+    <input type="hidden" asp-for="UserId" />
+    <input type="hidden" asp-for="Token" />
+    <input type="hidden" asp-for="ReturnUrl" />
+    <div asp-validation-summary="ModelOnly" role="alert"></div>
+    <div class="form-field">
+        <label asp-for="Input.Password">Password</label>
+        <input asp-for="Input.Password" autocomplete="new-password"
+               aria-describedby="Input_Password-error"
+               aria-invalid="@(ViewData.ModelState["Input.Password"]?.Errors.Count > 0 ? "true" : "false")" />
+        <span asp-validation-for="Input.Password" id="Input_Password-error"></span>
+    </div>
+    <div class="form-field">
+        <label asp-for="Input.ConfirmPassword">Confirm password</label>
+        <input asp-for="Input.ConfirmPassword" autocomplete="new-password"
+               aria-describedby="Input_ConfirmPassword-error"
+               aria-invalid="@(ViewData.ModelState["Input.ConfirmPassword"]?.Errors.Count > 0 ? "true" : "false")" />
+        <span asp-validation-for="Input.ConfirmPassword" id="Input_ConfirmPassword-error"></span>
+    </div>
+    <button type="submit">Set password and continue</button>
+</form>

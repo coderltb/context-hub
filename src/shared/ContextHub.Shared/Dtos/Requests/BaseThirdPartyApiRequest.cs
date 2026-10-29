@@ -3,6 +3,7 @@ namespace ContextHub.Shared.Dtos.Requests;
 /// <summary>
 /// Describes an integration request that feature-specific DTOs can extend without depending on ASP.NET.
 /// </summary>
+[PublicAPI]
 public class BaseThirdPartyApiRequest
 {
     /// <summary>

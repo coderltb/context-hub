@@ -1,0 +1,34 @@
+[*.cs]
+indent_style = space
+indent_size = 4
+csharp_prefer_braces = true:warning
+dotnet_diagnostic.IDE0011.severity = warning
+
+# Keep the existing shared constant vocabulary consistent across services and tests.
+dotnet_naming_rule.constant_fields_are_upper_snake.severity = warning
+dotnet_naming_rule.constant_fields_are_upper_snake.symbols = constant_fields
+dotnet_naming_rule.constant_fields_are_upper_snake.style = upper_snake
+dotnet_naming_symbols.constant_fields.applicable_kinds = field
+dotnet_naming_symbols.constant_fields.required_modifiers = const
+dotnet_naming_symbols.constant_fields.resharper_applicable_kinds = constant_field
+dotnet_naming_style.upper_snake.capitalization = all_upper
+dotnet_naming_style.upper_snake.word_separator = _
+
+# Public readonly lookup tables follow the same convention as constants.
+dotnet_naming_rule.readonly_fields_are_upper_snake.severity = warning
+dotnet_naming_rule.readonly_fields_are_upper_snake.symbols = public_readonly_fields
+dotnet_naming_rule.readonly_fields_are_upper_snake.style = upper_snake
+dotnet_naming_symbols.public_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.public_readonly_fields.applicable_accessibilities = public, internal
+dotnet_naming_symbols.public_readonly_fields.required_modifiers = static, readonly
+dotnet_naming_symbols.public_readonly_fields.resharper_applicable_kinds = readonly_field
+dotnet_naming_symbols.public_readonly_fields.resharper_required_modifiers = static
+
+# Repository subclasses share a readonly context, not a public lookup constant.
+dotnet_naming_rule.protected_fields_are_underscore_camel.severity = warning
+dotnet_naming_rule.protected_fields_are_underscore_camel.symbols = protected_fields
+dotnet_naming_rule.protected_fields_are_underscore_camel.style = underscore_camel
+dotnet_naming_symbols.protected_fields.applicable_kinds = field
+dotnet_naming_symbols.protected_fields.applicable_accessibilities = protected, protected_internal, private_protected
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_style.underscore_camel.required_prefix = _

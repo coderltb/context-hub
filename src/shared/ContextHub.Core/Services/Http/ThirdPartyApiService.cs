@@ -37,27 +37,9 @@ public class ThirdPartyApiService(
         using var bodyCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         bodyCancellation.CancelAfter(TimeSpan.FromSeconds(CoreConstants.HttpVariables.BODY_READ_TIMEOUT_SECONDS));
 
-        string content;
-        try
-        {
-            // Limit this catch boundary to consumption so transport and upstream-status failures are not logged twice.
-            await response.Content.LoadIntoBufferAsync(CoreConstants.HttpVariables.MAX_RESPONSE_BYTES, bodyCancellation.Token);
-            content = await response.Content.ReadAsStringAsync(bodyCancellation.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogDebug(CoreLogConstants.HttpLogs.BODY_READ_CANCELLED, typeof(TRequest).Name, (int)response.StatusCode);
-
-            // Preserve both caller cancellation and the independent body deadline; response disposal still runs.
-            throw;
-        }
-        catch (Exception exception) when (exception is HttpRequestException or IOException)
-        {
-            logger.LogWarning(CoreLogConstants.HttpLogs.BODY_READ_FAILED, typeof(TRequest).Name, (int)response.StatusCode, exception.GetType().Name);
-
-            // Provider messages can contain credentials; report only the type and rethrow the original failure.
-            throw;
-        }
+        // Keep native read failures with the caller; the response and linked deadline remain locally owned.
+        await response.Content.LoadIntoBufferAsync(CoreConstants.HttpVariables.MAX_RESPONSE_BYTES, bodyCancellation.Token);
+        var content = await response.Content.ReadAsStringAsync(bodyCancellation.Token);
 
         var maskedContent = LogMaskingHelper.MaskAllSensitiveData(content);
 
@@ -109,7 +91,7 @@ public class ThirdPartyApiService(
         dto.RequestStream = request.ContentStream;
 
         // Normalize only the verb locally; do not rewrite the caller's DTO or serialize its extension properties.
-        return request.Method?.ToUpperInvariant() switch
+        return request.Method.ToUpperInvariant() switch
         {
             "GET" => restClient.GetAsync(dto, cancellationToken),
             "POST" => restClient.PostAsync(dto, cancellationToken),

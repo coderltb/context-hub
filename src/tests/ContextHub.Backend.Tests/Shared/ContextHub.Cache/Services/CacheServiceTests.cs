@@ -6,6 +6,67 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Cache.Services;
 public sealed class CacheServiceTests
 {
     /// <summary>
+    /// Supplies one shared lifetime when callers do not select a feature-specific policy.
+    /// </summary>
+    [Fact]
+    public void RegistrationHasCommonLifetimeDefaults()
+    {
+        var services = new ServiceCollection().AddLogging().AddCache();
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<HybridCacheOptions>>().Value;
+
+        Assert.Equal(TimeSpan.FromSeconds(60), options.DefaultEntryOptions!.Expiration);
+        Assert.Equal(TimeSpan.FromSeconds(15), options.DefaultEntryOptions.LocalCacheExpiration);
+    }
+
+    /// <summary>
+    /// Accepts omitted and explicit-null policies while preserving normal native caching behavior.
+    /// </summary>
+    /// <returns>The actual native cache read/write assertions.</returns>
+    [Fact]
+    public async Task OptionalPolicyUsesSharedDefaultsWithoutAnExtraResolver()
+    {
+        var services = new ServiceCollection().AddLogging().AddCache();
+        using var provider = services.BuildServiceProvider();
+        var cache = provider.GetRequiredService<ICacheService>();
+        var key = CacheKey.Create("optional-policy", 1, "entry");
+        await cache.SetAsync(key, "stored");
+
+        Assert.Equal("stored", await cache.GetOrCreateAsync(key, _ => ValueTask.FromResult("unexpected")));
+        await cache.SetAsync(key, "replaced", policy: null);
+        Assert.Equal("replaced", await cache.GetAsync<string>(key));
+    }
+
+    /// <summary>
+    /// Keeps native host flags and lifetimes across repeated registration and null-policy calls.
+    /// </summary>
+    /// <returns>The native bypass and explicit-override assertions.</returns>
+    [Fact]
+    public async Task HostDefaultsSurviveRepeatedRegistrationAndExplicitPolicyCanOverride()
+    {
+        var services = new ServiceCollection().AddLogging().AddCache(options => options.DefaultEntryOptions = new()
+        {
+            Expiration = TimeSpan.FromSeconds(120),
+            LocalCacheExpiration = TimeSpan.FromSeconds(30),
+            Flags = HybridCacheEntryFlags.DisableLocalCacheWrite
+        });
+        services.AddCache();
+        using var provider = services.BuildServiceProvider();
+        var defaults = provider.GetRequiredService<IOptions<HybridCacheOptions>>().Value.DefaultEntryOptions!;
+        Assert.Equal(TimeSpan.FromSeconds(120), defaults.Expiration);
+        Assert.Equal(TimeSpan.FromSeconds(30), defaults.LocalCacheExpiration);
+        Assert.Equal(HybridCacheEntryFlags.DisableLocalCacheWrite, defaults.Flags);
+        var cache = provider.GetRequiredService<ICacheService>();
+        var key = CacheKey.Create("optional-policy", 1, "host-flags");
+        await cache.SetAsync(key, "not-stored");
+        Assert.Null(await cache.GetAsync<string>(key));
+
+        var policy = new CacheEntryPolicy(TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(20), flags: HybridCacheEntryFlags.None);
+        await cache.SetAsync(key, "explicit", policy);
+        Assert.Equal("explicit", await cache.GetAsync<string>(key));
+    }
+
+    /// <summary>
     /// Forwards native read and write bypass flags without changing the default cache policy.
     /// </summary>
     /// <param name="useRedis">Whether two providers share a real Redis secondary cache.</param>
@@ -151,10 +212,12 @@ public sealed class CacheServiceTests
             await release.Task.WaitAsync(token);
             return "value";
         }
-        var first = cache.GetOrCreateAsync(key, Factory, policy).AsTask();
+        var firstOperation = cache.GetOrCreateAsync(key, Factory, policy);
+        var first = firstOperation.AsTask();
         // Hold the first factory open until the second caller joins; a delay alone would make coalescing flaky.
         await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        var second = cache.GetOrCreateAsync(key, Factory, policy).AsTask();
+        var secondOperation = cache.GetOrCreateAsync(key, Factory, policy);
+        var second = secondOperation.AsTask();
         release.TrySetResult();
 
         Assert.Equal(["value", "value"], await Task.WhenAll(first, second));
@@ -221,8 +284,14 @@ public sealed class CacheServiceTests
     private static ServiceProvider CreateProvider(string? connectionString = null)
     {
         var services = new ServiceCollection().AddLogging();
-        if (connectionString is null) services.AddCache();
-        else services.AddRedisCache(options => options.Configuration = connectionString);
+        if (connectionString is null)
+        {
+            services.AddCache();
+        }
+        else
+        {
+            services.AddRedisCache(options => options.Configuration = connectionString);
+        }
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true });
     }
 }

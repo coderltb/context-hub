@@ -4,7 +4,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.DependencyInjection;
 /// Checks that persistence registration binds repository staging and Unit of Work saving to the same scoped context.
 /// </summary>
 /// <param name="postgreSql">The disposable PostgreSQL fixture used for observable saves.</param>
-[Collection(PostgreSqlCollection.Name)]
+[Collection(PostgreSqlCollection.NAME)]
 public sealed class PersistenceContextRegistrationTests(PostgreSqlFixture postgreSql)
 {
     /// <summary>

@@ -68,7 +68,7 @@ public sealed class PaginationTests
         var page = new PageResponse<string>(source, new PageRequest(), 1);
         source.Clear();
 
-        var json = System.Text.Json.JsonSerializer.Serialize(page, System.Text.Json.JsonSerializerOptions.Web);
+        var json = JsonSerializer.Serialize(page, JsonSerializerOptions.Web);
         Assert.Single(page.Items);
         Assert.Contains("\"totalCount\":1", json);
         Assert.Contains("\"pageSize\":20", json);

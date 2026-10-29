@@ -20,13 +20,14 @@ public sealed class SafeActivityProcessor : BaseProcessor<Activity>
         }
 
         // Instrumentation tag names evolve; an allowlist cannot accidentally expose a new sensitive tag.
-        foreach (var tag in activity.TagObjects.ToArray())
+        foreach (var tag in activity.TagObjects.Where(tag => tag.Key is not
+            (ObservabilityConstants.TelemetryTags.HTTP_METHOD
+            or ObservabilityConstants.TelemetryTags.HTTP_STATUS
+            or ObservabilityConstants.TelemetryTags.PROTOCOL_VERSION
+            or ObservabilityConstants.TelemetryTags.ERROR_TYPE
+            or ObservabilityConstants.TelemetryTags.OTEL_STATUS_CODE)).ToArray())
         {
-            if (tag.Key is not ("http.request.method" or "http.response.status_code" or "network.protocol.version"
-                or "error.type" or "otel.status_code"))
-            {
-                activity.SetTag(tag.Key, null);
-            }
+            activity.SetTag(tag.Key, null);
         }
 
         // HttpClient display names may contain caller-controlled values. Export an operation class, not a URL.

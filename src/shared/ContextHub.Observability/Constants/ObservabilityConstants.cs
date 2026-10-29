@@ -46,21 +46,6 @@ public static class ObservabilityConstants
     public const string LOGGING_SECTION = "Observability:Logging";
 
     /// <summary>
-    /// Compact JSON console format name.
-    /// </summary>
-    public const string COMPACT_JSON = "CompactJson";
-
-    /// <summary>
-    /// Development text console format name.
-    /// </summary>
-    public const string TEXT = "Text";
-
-    /// <summary>
-    /// Dual console mode with compact JSON on stdout and a readable copy on stderr.
-    /// </summary>
-    public const string BOTH = "Both";
-
-    /// <summary>
     /// Readable output template omitting raw exception details.
     /// </summary>
     public const string TEXT_OUTPUT_TEMPLATE = "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj} {Properties:j}{NewLine}";
@@ -69,16 +54,6 @@ public static class ObservabilityConstants
     /// Safe exception type property name.
     /// </summary>
     public const string EXCEPTION_TYPE = "ExceptionType";
-
-    /// <summary>
-    /// W3C trace identifier property name.
-    /// </summary>
-    public const string TRACE_ID = "TraceId";
-
-    /// <summary>
-    /// W3C span identifier property name.
-    /// </summary>
-    public const string SPAN_ID = "SpanId";
 
     /// <summary>
     /// Service identity property name.
@@ -114,4 +89,35 @@ public static class ObservabilityConstants
     /// Name of the shared application activity source.
     /// </summary>
     public const string ACTIVITY_SOURCE = "ContextHub";
+
+    /// <summary>
+    /// Names the native instrumentation tags permitted at the export boundary.
+    /// </summary>
+    public static class TelemetryTags
+    {
+        /// <summary>
+        /// Identifies the transport method without collecting a URL or payload.
+        /// </summary>
+        public const string HTTP_METHOD = "http.request.method";
+
+        /// <summary>
+        /// Identifies the numeric transport response status.
+        /// </summary>
+        public const string HTTP_STATUS = "http.response.status_code";
+
+        /// <summary>
+        /// Identifies the negotiated protocol version.
+        /// </summary>
+        public const string PROTOCOL_VERSION = "network.protocol.version";
+
+        /// <summary>
+        /// Identifies a bounded failure category without an exception message.
+        /// </summary>
+        public const string ERROR_TYPE = "error.type";
+
+        /// <summary>
+        /// Identifies the native OpenTelemetry status category.
+        /// </summary>
+        public const string OTEL_STATUS_CODE = "otel.status_code";
+    }
 }

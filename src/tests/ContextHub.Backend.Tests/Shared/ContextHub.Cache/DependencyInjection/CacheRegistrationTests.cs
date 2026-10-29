@@ -6,6 +6,68 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Cache.DependencyInjection;
 public sealed class CacheRegistrationTests
 {
     /// <summary>
+    /// Binds structured Redis settings into native options without opening a pool or enabling distributed payload caching.
+    /// </summary>
+    [Fact]
+    public void StructuredRedisOptionsConfigureOneLazyConnection()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CacheSettings:RedisSettings:Host"] = "redis.example.test",
+            ["CacheSettings:RedisSettings:Port"] = "6380",
+            ["CacheSettings:RedisSettings:Password"] = "test-only-secret",
+            ["CacheSettings:RedisSettings:Ssl"] = "true",
+            ["CacheSettings:RedisSettings:DbNumber"] = "4",
+            ["CacheSettings:RedisSettings:ConnectRetry"] = "2",
+            ["CacheSettings:RedisSettings:ConnectTimeout"] = "1200",
+            ["CacheSettings:RedisSettings:SyncTimeout"] = "1300",
+            ["CacheSettings:RedisSettings:AsyncTimeout"] = "1400"
+        }).Build();
+        var services = new ServiceCollection().AddLogging();
+        services.AddRedisConnection(configuration.GetSection("CacheSettings:RedisSettings"));
+        var pool = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IConnectionMultiplexer));
+        services.AddRedisConnection(configuration.GetSection("CacheSettings:RedisSettings"));
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        var options = provider.GetRequiredService<IOptions<ConfigurationOptions>>().Value;
+
+        var endpoint = Assert.IsType<DnsEndPoint>(Assert.Single(options.EndPoints));
+        Assert.Equal("redis.example.test", endpoint.Host);
+        Assert.Equal(6380, endpoint.Port);
+        Assert.Equal("test-only-secret", options.Password);
+        Assert.True(options.Ssl);
+        Assert.Equal(4, options.DefaultDatabase);
+        Assert.Equal(2, options.ConnectRetry);
+        Assert.Equal(1200, options.ConnectTimeout);
+        Assert.Equal(1300, options.SyncTimeout);
+        Assert.Equal(1400, options.AsyncTimeout);
+        Assert.Same(pool, Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IConnectionMultiplexer)));
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IDistributedCache));
+    }
+
+    /// <summary>
+    /// Retains native timeout and connection-failure defaults when optional fields are omitted.
+    /// </summary>
+    [Fact]
+    public void StructuredRedisOptionsPreserveNativeDefaults()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["CacheSettings:RedisSettings:Host"] = "unused.example.test"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddRedisConnection(configuration.GetSection("CacheSettings:RedisSettings"));
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<ConfigurationOptions>>().Value;
+        var native = new ConfigurationOptions();
+
+        Assert.Equal(native.ConnectRetry, options.ConnectRetry);
+        Assert.Equal(native.ConnectTimeout, options.ConnectTimeout);
+        Assert.Equal(native.SyncTimeout, options.SyncTimeout);
+        Assert.Equal(native.AsyncTimeout, options.AsyncTimeout);
+        Assert.Equal(native.AbortOnConnectFail, options.AbortOnConnectFail);
+    }
+
+    /// <summary>
     /// Rejects a missing callback before Redis composition changes the container.
     /// </summary>
     [Fact]

@@ -64,7 +64,7 @@ public sealed class AtomicCacheService : IAtomicCacheService
             var milliseconds = Math.Max(1, checked((long)Math.Ceiling(expiration.TotalMilliseconds)));
             var result = await _connection.GetDatabase().ScriptEvaluateAsync(
                 CacheConstants.AtomicVariables.INCREMENT_WITH_EXPIRATION,
-                [new RedisKey(key)], [(RedisValue)milliseconds]);
+                [new RedisKey(key)], [milliseconds]);
 
             return (long)result;
         }, cancellationToken);

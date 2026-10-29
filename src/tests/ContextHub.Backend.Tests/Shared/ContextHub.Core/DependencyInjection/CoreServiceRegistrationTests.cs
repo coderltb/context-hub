@@ -3,7 +3,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.DependencyInjection;
 /// <summary>
 /// Verifies explicit registration of Core validation and service-owned persistence dependencies.
 /// </summary>
-[Collection(nameof(Mappings.GlobalMappingCollection))]
+[Collection(nameof(GlobalMappingCollection))]
 public sealed class CoreServiceRegistrationTests
 {
     /// <summary>
@@ -170,5 +170,8 @@ public sealed class CoreServiceRegistrationTests
     /// <summary>
     /// Provides an entity type for resolving the open generic repository registration.
     /// </summary>
-    private sealed class TestEntity;
+    private sealed class TestEntity
+    {
+        // Open-generic resolution needs an entity type, not mapped database fields.
+    }
 }

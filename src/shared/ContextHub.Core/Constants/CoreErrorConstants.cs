@@ -73,6 +73,11 @@ public static class CoreErrorConstants
         /// Rejects a transaction whose connection is closed or detached.
         /// </summary>
         public const string TRANSACTION_CONNECTION_REQUIRED = "The borrowed transaction requires an open connection.";
+
+        /// <summary>
+        /// Rejects callback execution when a caller-owned transaction has a different explicit isolation contract.
+        /// </summary>
+        public const string TRANSACTION_ISOLATION_CONFLICT = "The existing transaction has a different isolation level.";
     }
 
     /// <summary>
@@ -136,17 +141,6 @@ public static class CoreErrorConstants
         /// Describes a duplicate failure without exposing the repeated values.
         /// </summary>
         public const string COLLECTION_DUPLICATES_MESSAGE = "{PropertyName} must contain distinct items.";
-    }
-
-    /// <summary>
-    /// Safe errors from typed query configuration without field values or search keywords.
-    /// </summary>
-    public static class QueryErrors
-    {
-        /// <summary>
-        /// Requires explicit valid text fields rather than silently dropping an active search.
-        /// </summary>
-        public const string TEXT_FIELDS_REQUIRED = "An active text search requires at least one valid string selector.";
     }
 
     /// <summary>

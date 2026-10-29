@@ -90,5 +90,8 @@ public sealed class AuditedDbContextRegistrationTests
     /// <summary>
     /// Provides a repository type argument without registering a repository as a side effect.
     /// </summary>
-    private sealed class RegistrationEntity;
+    private sealed class RegistrationEntity
+    {
+        // Only type identity is needed to verify repository registration side effects.
+    }
 }

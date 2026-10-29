@@ -6,6 +6,21 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Shared.Helpers;
 public sealed class LogMaskingTests
 {
     /// <summary>
+    /// Masks password-change credentials by complete field name while preserving harmless counters.
+    /// </summary>
+    [Fact]
+    public void PasswordChangeFieldsNeverExposeCredentials()
+    {
+        const string input = """{"currentPassword":"old-secret","newPassword":"new-secret","confirmPassword":"new-secret","passwordChangedCount":2}""";
+        var masked = LogMaskingHelper.MaskAllSensitiveData(input);
+
+        Assert.DoesNotContain("old-secret", masked);
+        Assert.DoesNotContain("new-secret", masked);
+        Assert.Contains("passwordChangedCount", masked);
+        Assert.Contains("2", masked);
+    }
+
+    /// <summary>
     /// Masks the entire sensitive parent value even when its quoted content contains otherwise safe JSON fields.
     /// </summary>
     /// <param name="input">The sensitive named pair carrying an encoded JSON value.</param>

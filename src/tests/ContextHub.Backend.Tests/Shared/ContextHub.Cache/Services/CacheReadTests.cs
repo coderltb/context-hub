@@ -64,18 +64,20 @@ public sealed class CacheReadTests
         var policy = new CacheEntryPolicy(TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(30));
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var creation = cache.GetOrCreateAsync<string>(key, async token =>
+        var creationOperation = cache.GetOrCreateAsync<string>(key, async token =>
         {
             started.TrySetResult();
             await release.Task.WaitAsync(token);
 
             return "created";
-        }, policy).AsTask();
+        }, policy);
+        var creation = creationOperation.AsTask();
 
         try
         {
             await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Null(await cache.GetAsync<string>(key).AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+            var readOperation = cache.GetAsync<string>(key);
+            Assert.Null(await readOperation.AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
         }
         finally
         {
@@ -278,7 +280,7 @@ public sealed class CacheReadTests
         /// </summary>
         /// <param name="key">The key requested by native HybridCache.</param>
         /// <returns>No payload because this fixture always fails the external read.</returns>
-        public byte[]? Get(string key) => throw new IOException("fixture secondary store unavailable");
+        public byte[] Get(string key) => throw new IOException("fixture secondary store unavailable");
 
         /// <summary>
         /// Simulates the same secondary failure for asynchronous native reads.

@@ -176,7 +176,7 @@ public sealed class ApiExceptionSecurityTests
 
         if (scenario == "cancelled")
         {
-            cancellation.Cancel();
+            await cancellation.CancelAsync();
             http.RequestAborted = cancellation.Token;
         }
 

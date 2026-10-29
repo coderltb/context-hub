@@ -1,0 +1,29 @@
+@page
+@model LoginModel
+@{
+    ViewData["Title"] = "Sign in";
+}
+<h1>Sign in</h1>
+
+<p>Sign in with your Owner username and password. Client tokens do not sign in here.</p>
+
+<form class="sso-form" method="post">
+    <input type="hidden" asp-for="ReturnUrl" />
+    <div asp-validation-summary="ModelOnly" role="alert"></div>
+    <div class="form-field">
+        <label asp-for="Input.UserName">Username</label>
+        <input asp-for="Input.UserName" autocomplete="username"
+               aria-describedby="Input_UserName-error"
+               aria-invalid="@(ViewData.ModelState["Input.UserName"]?.Errors.Count > 0 ? "true" : "false")" />
+        <span asp-validation-for="Input.UserName" id="Input_UserName-error"></span>
+    </div>
+    <div class="form-field">
+        <label asp-for="Input.Password">Password</label>
+        <input asp-for="Input.Password" autocomplete="current-password"
+               aria-describedby="Input_Password-error"
+               aria-invalid="@(ViewData.ModelState["Input.Password"]?.Errors.Count > 0 ? "true" : "false")" />
+        <span asp-validation-for="Input.Password" id="Input_Password-error"></span>
+    </div>
+    <button type="submit">Continue</button>
+    <a asp-page="@SsoPageConstants.FORGOT_PAGE" asp-route-returnUrl="@Model.ReturnUrl">Forgot password?</a>
+</form>

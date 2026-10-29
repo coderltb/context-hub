@@ -165,7 +165,10 @@ public sealed class ApiPipelineTests
 
         Assert.True(Guid.TryParseExact(actual, "D", out _));
         Assert.Equal(preserved, incoming == actual);
-        if (incoming == "invalid-secret-value") Assert.DoesNotContain(incoming, body);
+        if (incoming == "invalid-secret-value")
+        {
+            Assert.DoesNotContain(incoming, body);
+        }
         AssertMetadata(response, json.RootElement);
     }
 

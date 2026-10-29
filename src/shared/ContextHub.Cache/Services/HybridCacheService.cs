@@ -73,18 +73,17 @@ public sealed class HybridCacheService : ICacheService
     /// <typeparam name="T">The cache projection.</typeparam>
     /// <param name="key">The validated exact key.</param>
     /// <param name="factory">The source-read callback.</param>
-    /// <param name="policy">The explicit L1/L2 lifetime.</param>
+    /// <param name="policy">The optional L1/L2 lifetime; null preserves native host defaults.</param>
     /// <param name="cancellationToken">Cancels this caller.</param>
     /// <returns>The cached or source value.</returns>
     public async ValueTask<T> GetOrCreateAsync<T>(
         CacheKey key,
         Func<CancellationToken, ValueTask<T>> factory,
-        CacheEntryPolicy policy,
+        CacheEntryPolicy? policy = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(factory);
-        ArgumentNullException.ThrowIfNull(policy);
 
         _logger.LogDebug(CacheLogConstants.EntryLogs.STARTED, nameof(GetOrCreateAsync), key.Namespace);
 
@@ -97,8 +96,8 @@ public sealed class HybridCacheService : ICacheService
 
                 return await factory(token);
             },
-            policy.ToOptions(),
-            tags: policy.Tags,
+            policy?.ToOptions(),
+            tags: policy?.Tags,
             cancellationToken: cancellationToken);
 
         // A resolved value may come from either cache tier or the factory; do not invent hit/miss telemetry.
@@ -113,21 +112,20 @@ public sealed class HybridCacheService : ICacheService
     /// <typeparam name="T">The cache projection.</typeparam>
     /// <param name="key">The exact key.</param>
     /// <param name="value">The approved non-sensitive data.</param>
-    /// <param name="policy">The explicit lifetime.</param>
+    /// <param name="policy">The optional lifetime; null preserves native host defaults.</param>
     /// <param name="cancellationToken">Stops the write.</param>
     /// <returns>The native cache write.</returns>
     public async ValueTask SetAsync<T>(
         CacheKey key,
         T value,
-        CacheEntryPolicy policy,
+        CacheEntryPolicy? policy = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
-        ArgumentNullException.ThrowIfNull(policy);
 
         _logger.LogDebug(CacheLogConstants.EntryLogs.STARTED, nameof(SetAsync), key.Namespace);
 
-        await _cache.SetAsync(key.Value, value, policy.ToOptions(), tags: policy.Tags, cancellationToken: cancellationToken);
+        await _cache.SetAsync(key.Value, value, policy?.ToOptions(), tags: policy?.Tags, cancellationToken: cancellationToken);
         _logger.LogDebug(CacheLogConstants.EntryLogs.STORED, key.Namespace);
     }
 
