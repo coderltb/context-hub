@@ -3,7 +3,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.Services.Http;
 /// <summary>
 /// Exercises DTO-based REST calls through DI without mutating caller data or sharing credentials.
 /// </summary>
-[Collection(nameof(Mappings.GlobalMappingCollection))]
+[Collection(nameof(GlobalMappingCollection))]
 public sealed class RestRequestDtoTests
 {
     /// <summary>

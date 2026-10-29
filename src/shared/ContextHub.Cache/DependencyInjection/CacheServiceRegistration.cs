@@ -23,6 +23,49 @@ public static class CacheServiceRegistration
     }
 
     /// <summary>
+    /// Registers one lazy Redis pool from structured host options without changing cache or coordination mode.
+    /// </summary>
+    /// <param name="services">The host container owning the connection lifetime.</param>
+    /// <param name="section">The host-selected RedisSettings section; secrets stay in external configuration.</param>
+    /// <returns>The same collection for explicit cache or coordination composition.</returns>
+    public static IServiceCollection AddRedisConnection(
+        this IServiceCollection services,
+        IConfigurationSection section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+
+        // Preserve an existing host-owned pool and its configuration; repeated composition must not add endpoints or pools.
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(IConnectionMultiplexer)))
+        {
+            return services;
+        }
+
+        // Bind structured deployment settings once and translate them into native connection options without logging credentials.
+        services.AddOptions<RedisOptions>().Bind(section);
+        services.AddOptions<ConfigurationOptions>().Configure<IOptions<RedisOptions>>((options, configured) =>
+        {
+            var redis = configured.Value;
+            options.EndPoints.Add(redis.Host, redis.Port);
+            options.Password = redis.Password;
+            options.Ssl = redis.Ssl;
+            options.DefaultDatabase = redis.DbNumber;
+
+            // Omitted optional fields retain native client semantics instead of inheriting an application's retry policy.
+            options.ConnectRetry = redis.ConnectRetry ?? options.ConnectRetry;
+            options.ConnectTimeout = redis.ConnectTimeout ?? options.ConnectTimeout;
+            options.SyncTimeout = redis.SyncTimeout ?? options.SyncTimeout;
+            options.AsyncTimeout = redis.AsyncTimeout ?? options.AsyncTimeout;
+            options.AbortOnConnectFail = redis.AbortOnConnectFail ?? options.AbortOnConnectFail;
+        });
+
+        // Open the shared pool only when a registered capability resolves it; DI owns its eventual disposal.
+        services.TryAddSingleton<IConnectionMultiplexer>(provider => ConnectionMultiplexer.Connect(
+            provider.GetRequiredService<IOptions<ConfigurationOptions>>().Value));
+
+        return services;
+    }
+
+    /// <summary>
     /// Registers HybridCache and the capability-facing cache abstraction, with bounded native defaults.
     /// </summary>
     /// <param name="services">The host service collection.</param>
@@ -32,11 +75,21 @@ public static class CacheServiceRegistration
         this IServiceCollection services,
         Action<HybridCacheOptions>? configure = null)
     {
+        // Bound payload/key sizes before applying the host callback, then fill only the cache lifetimes the host left unspecified.
         services.AddHybridCache(options =>
         {
             options.MaximumPayloadBytes = CacheConstants.HybridCacheVariables.MAX_PAYLOAD_BYTES;
             options.MaximumKeyLength = CacheConstants.HybridCacheVariables.MAX_KEY_LENGTH;
             configure?.Invoke(options);
+
+            // Fill only omitted lifetimes after the host callback; preserve flags and repeated-registration overrides.
+            var defaults = options.DefaultEntryOptions;
+            options.DefaultEntryOptions = new HybridCacheEntryOptions
+            {
+                Expiration = defaults?.Expiration ?? TimeSpan.FromSeconds(CacheConstants.HybridCacheVariables.DEFAULT_EXPIRATION_SECONDS),
+                LocalCacheExpiration = defaults?.LocalCacheExpiration ?? TimeSpan.FromSeconds(CacheConstants.HybridCacheVariables.DEFAULT_LOCAL_EXPIRATION_SECONDS),
+                Flags = defaults?.Flags
+            };
         });
         services.TryAddSingleton<ICacheService, HybridCacheService>();
 

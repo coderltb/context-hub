@@ -39,4 +39,29 @@ public static class ApiCommonOpenApiConstants
     /// Supplies a synthetic W3C span identifier.
     /// </summary>
     public const string EXAMPLE_SPAN_ID = "0000000000000001";
+
+    /// <summary>
+    /// Identifies the local Swagger operation-search asset.
+    /// </summary>
+    public const string SEARCH_SCRIPT_PATH = "/swagger-assets/operation-search.js";
+
+    /// <summary>
+    /// Identifies the script embedded in the shared API assembly.
+    /// </summary>
+    public const string SEARCH_SCRIPT_RESOURCE = "ContextHub.ApiCommon.Assets.Swagger.operation-search.js";
+
+    /// <summary>
+    /// Declares the browser script media type.
+    /// </summary>
+    public const string JAVASCRIPT_CONTENT_TYPE = "application/javascript; charset=utf-8";
+
+    /// <summary>
+    /// Reports a packaging error without including request data.
+    /// </summary>
+    public const string SEARCH_SCRIPT_MISSING = "The embedded Swagger operation-search script is missing.";
+
+    /// <summary>
+    /// Names the configuration section bound to native Swagger UI options.
+    /// </summary>
+    public const string SWAGGER_UI_SECTION = "SwaggerUI";
 }

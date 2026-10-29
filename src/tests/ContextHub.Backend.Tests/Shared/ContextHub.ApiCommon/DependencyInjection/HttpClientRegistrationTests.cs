@@ -116,13 +116,13 @@ public sealed class HttpClientRegistrationTests
         using var response = await provider.GetRequiredService<IRestClientMultipleService>().SendAsync("private-upstream", request);
 
         Assert.NotEmpty(messages);
-        Assert.All(messages, message =>
+        foreach (var message in messages)
         {
             Assert.DoesNotContain("private-path", message, StringComparison.Ordinal);
             Assert.DoesNotContain("synthetic-credential", message, StringComparison.Ordinal);
             Assert.DoesNotContain("synthetic-identity", message, StringComparison.Ordinal);
             Assert.DoesNotContain("synthetic-body", message, StringComparison.Ordinal);
-        });
+        }
     }
 
     /// <summary>

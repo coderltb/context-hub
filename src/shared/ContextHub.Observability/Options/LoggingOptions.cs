@@ -3,12 +3,13 @@ namespace ContextHub.Observability.Options;
 /// <summary>
 /// Defines startup console rendering and diagnostic thresholds shared by both backend API hosts.
 /// </summary>
+[UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
 public sealed class LoggingOptions
 {
     /// <summary>
-    /// Gets or sets Text, CompactJson, or Both; only Both adds a text copy on stderr.
+    /// Gets or sets the native configuration-bound rendering mode; JSON settings keep Text, CompactJson or Both names.
     /// </summary>
-    public string ConsoleFormat { get; set; } = ObservabilityConstants.COMPACT_JSON;
+    public ConsoleLogFormat ConsoleFormat { get; set; } = ConsoleLogFormat.CompactJson;
 
     /// <summary>
     /// Gets or sets the minimum Serilog level used when the host does not override a category.
@@ -16,7 +17,7 @@ public sealed class LoggingOptions
     public LogEventLevel MinimumLevel { get; set; } = LogEventLevel.Information;
 
     /// <summary>
-    /// Gets or sets native Serilog category-prefix overrides without changing the default for other categories.
+    /// Gets or sets raw category-prefix overrides; null configuration is rejected during startup validation.
     /// </summary>
-    public Dictionary<string, LogEventLevel> MinimumLevelOverrides { get; set; } = new();
+    public Dictionary<string, LogEventLevel>? MinimumLevelOverrides { get; set; } = new();
 }

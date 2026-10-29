@@ -6,19 +6,39 @@ namespace ContextHub.Core.Constants;
 public static class CoreConstants
 {
     /// <summary>
-    /// Bounds pure identifier generation independently of service uniqueness policy.
+    /// Defines the selected mail transport and its native resilience defaults.
     /// </summary>
-    public static class CodeVariables
+    public static class EmailVariables
     {
         /// <summary>
-        /// Maximum number of cryptographically generated decimal digits.
+        /// Names the dedicated factory transport; its circuit is independent from REST clients.
         /// </summary>
-        public const int MAX_LENGTH = 32;
+        public const string HTTP_CLIENT_NAME = "SendGrid";
 
         /// <summary>
-        /// Default separator between a caller-owned prefix and numeric suffix.
+        /// Selects native HTTP resilience options under the host email section.
         /// </summary>
-        public const string SEPARATOR = "_";
+        public const string RESILIENCE_SECTION = "Resilience";
+
+        /// <summary>
+        /// Requires enough observations before opening the mail circuit.
+        /// </summary>
+        public const int MINIMUM_THROUGHPUT = 5;
+
+        /// <summary>
+        /// Opens the circuit when at least half of the observed attempts fail.
+        /// </summary>
+        public const double FAILURE_RATIO = 0.5;
+
+        /// <summary>
+        /// Bounds the circuit observation window in seconds.
+        /// </summary>
+        public const int SAMPLING_SECONDS = 30;
+
+        /// <summary>
+        /// Pauses mail attempts before allowing a native recovery probe.
+        /// </summary>
+        public const int BREAK_SECONDS = 15;
     }
 
     /// <summary>
@@ -43,17 +63,6 @@ public static class CoreConstants
     }
 
     /// <summary>
-    /// Defines reusable database execution defaults, not service-owned SQL.
-    /// </summary>
-    public static class DatabaseVariables
-    {
-        /// <summary>
-        /// Limits a default command to thirty seconds.
-        /// </summary>
-        public const int COMMAND_TIMEOUT_SECONDS = 30;
-    }
-
-    /// <summary>
     /// Defines shared JSON safety limits independently of diagnostic payloads.
     /// </summary>
     public static class JsonVariables
@@ -70,6 +79,21 @@ public static class CoreConstants
     public static class HttpVariables
     {
         /// <summary>
+        /// Allows retries only for safe methods.
+        /// </summary>
+        public const int MAX_RETRY_ATTEMPTS = 3;
+
+        /// <summary>
+        /// Bounds one transport attempt.
+        /// </summary>
+        public const int ATTEMPT_TIMEOUT_SECONDS = 10;
+
+        /// <summary>
+        /// Bounds the complete resilience pipeline.
+        /// </summary>
+        public const int TOTAL_TIMEOUT_SECONDS = 30;
+
+        /// <summary>
         /// Caps facade response consumption at one mebibyte; raw transport reads remain caller-owned.
         /// </summary>
         public const long MAX_RESPONSE_BYTES = 1_048_576;
@@ -78,28 +102,6 @@ public static class CoreConstants
         /// Bounds facade body consumption independently of the HTTP send timeout.
         /// </summary>
         public const int BODY_READ_TIMEOUT_SECONDS = 30;
-    }
-
-    /// <summary>
-    /// Defines entropy size independently of any service-specific credential format.
-    /// </summary>
-    public static class TokenVariables
-    {
-        /// <summary>
-        /// Provides two hundred fifty-six bits of cryptographic randomness.
-        /// </summary>
-        public const int OPAQUE_TOKEN_BYTES = 32;
-    }
-
-    /// <summary>
-    /// Defines expiration arithmetic defaults independently of token generation and cache policy.
-    /// </summary>
-    public static class TimeVariables
-    {
-        /// <summary>
-        /// Moves refresh decisions one minute before the real expiration boundary.
-        /// </summary>
-        public const int EXPIRATION_PADDING_SECONDS = 60;
     }
 
     /// <summary>

@@ -16,7 +16,7 @@ public sealed class TelemetryOptions
     public bool MetricsEnabled { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets bounded non-root path segments excluded from server traces; this does not hide HTTP completion logs or metrics.
+    /// Gets or sets raw trace-exclusion paths; null or invalid paths are rejected during registration.
     /// </summary>
-    public string[] ExcludedServerPaths { get; set; } = [];
+    public string[]? ExcludedServerPaths { get; set; } = [];
 }

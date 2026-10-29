@@ -75,13 +75,13 @@ public sealed class CoordinationFailureTests
     {
         var connection = DispatchProxy.Create<IConnectionMultiplexer, CommandFailureProxy>();
         var database = DispatchProxy.Create<RedisDatabase, CommandFailureProxy>();
-        ((CommandFailureProxy)(object)connection).Handler = (method, _) => method.Name switch
+        Assert.IsAssignableFrom<CommandFailureProxy>(connection).Handler = (method, _) => method.Name switch
         {
             "GetDatabase" => database,
             "Dispose" => null,
             _ => throw new NotSupportedException(method.Name)
         };
-        ((CommandFailureProxy)(object)database).Handler = (method, _) => method.Name switch
+        Assert.IsAssignableFrom<CommandFailureProxy>(database).Handler = (method, _) => method.Name switch
         {
             "get_Multiplexer" => connection,
             "get_Database" => 0,

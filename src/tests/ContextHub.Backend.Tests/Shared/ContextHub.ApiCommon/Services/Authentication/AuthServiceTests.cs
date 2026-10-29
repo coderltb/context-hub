@@ -51,7 +51,7 @@ public sealed class AuthServiceTests
         context.User.AddIdentity(new ClaimsIdentity([new Claim("scope", "read write read")], "test"));
         Assert.True(service.IsAuthenticated);
         Assert.False(service.HasRole("Owner"));
-        Assert.Equal(new[] { "read", "write" }, service.Scopes());
+        Assert.Equal(["read", "write"], service.Scopes());
         Assert.False(service.HasScope("Read"));
     }
 
@@ -71,9 +71,9 @@ public sealed class AuthServiceTests
         Assert.Equal("reader@example.test", service.Email);
         Assert.True(service.HasRole("Owner"));
         Assert.False(service.HasRole("owner"));
-        Assert.Equal(new[] { "Owner" }, service.Roles());
+        Assert.Equal(["Owner"], service.Roles());
         Assert.Equal(42, service.Get<int>("count"));
-        Assert.Equal(7, service.Get<int>("missing", 7));
+        Assert.Equal(7, service.Get("missing", 7));
         Assert.False(service.TryGet<DayOfWeek>("day", out _));
         service.EnsureAuthenticated();
     }

@@ -4,6 +4,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddLoggingInfrastructure(builder.Configuration, builder.Environment.ApplicationName, builder.Environment.EnvironmentName);
 builder.Services.AddCorrelation();
 builder.Services.AddOpenApi();
+builder.Services.AddHealthInfrastructure();
 
 var app = builder.Build();
 
@@ -19,28 +20,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-var summaries = new[]
+// Liveness checks only this process; dependency readiness remains a separate service-owned capability.
+app.MapHealthChecks(ApiRouteConstants.LIVENESS, new HealthCheckOptions
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    Predicate = registration => registration.Tags.Contains(HealthConstants.LIVENESS_TAG),
+    ResponseWriter = HealthResponseWriter.WriteLivenessAsync
+}).AllowAnonymous();
 
-app.MapGet("/weatherforecast", () =>
-   {
-       var forecast = Enumerable.Range(1, 5).Select(index =>
-                                    new WeatherForecast
-                                    (
-                                        DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                                        Random.Shared.Next(-20, 55),
-                                        summaries[Random.Shared.Next(summaries.Length)]
-                                    ))
-                                .ToArray();
-       return forecast;
-   })
-   .WithName("GetWeatherForecast");
-
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+await app.RunAsync();

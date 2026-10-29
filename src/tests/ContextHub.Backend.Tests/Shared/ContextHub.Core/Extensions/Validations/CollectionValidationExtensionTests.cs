@@ -128,7 +128,7 @@ public sealed class CollectionValidationExtensionTests
         {
             "array" => new[] { "one", "two" },
             "list" => new List<string> { "one", "two" },
-            _ => Array.AsReadOnly(new[] { "one", "two" })
+            _ => Array.AsReadOnly(["one", "two"])
         };
         var validator = CreateValidator();
 

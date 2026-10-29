@@ -230,7 +230,7 @@ public sealed class OpenApiRegistrationTests
             {
                 host.MapPost("/api/admin/v1/created", (Payload request) => TypedResults.Created("/fixture", request));
                 host.MapPost("/api/admin/v1/custom-conflict", (Payload request) => Results.Conflict(new OtherPayload(3)))
-                    .Produces<Payload>(200).Produces<OtherPayload>(409);
+                    .Produces<Payload>().Produces<OtherPayload>(409);
             }, boundary: true);
         using var client = app.GetTestClient();
         using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json"));
@@ -245,6 +245,86 @@ public sealed class OpenApiRegistrationTests
             new StringContent("{\"display_name\":\"runtime\"}", Encoding.UTF8, "application/json"));
         Assert.Equal(HttpStatusCode.Conflict, runtime.StatusCode);
         Assert.Contains("\"count\":3", await runtime.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// Publishes endpoint business errors without requiring a body DTO or a registered operation pair.
+    /// </summary>
+    /// <returns>The shared envelope, example and API-boundary assertions.</returns>
+    [Fact]
+    public async Task EndpointBusinessErrorsWorkWithoutRegisteredPair()
+    {
+        await using var app = await CreateHost(configure: host =>
+        {
+            host.MapGet("/api/admin/v1/endpoint-errors", () => TypedResults.Ok(new Payload("fixture")))
+                .WithMetadata(new OpenApiOperationAttribute(200, 404, 409));
+            host.MapGet("/connect/fixture", () => TypedResults.Ok(new Payload("protocol")))
+                .WithMetadata(new OpenApiOperationAttribute(200, 404, 409));
+        }, boundary: true);
+        using var client = app.GetTestClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json"));
+        var paths = document.RootElement.GetProperty("paths");
+        var responses = paths.GetProperty("/api/admin/v1/endpoint-errors").GetProperty("get").GetProperty("responses");
+
+        foreach (var (status, code) in new[] { ("404", "error_not_found"), ("409", "error_conflict") })
+        {
+            var media = responses.GetProperty(status).GetProperty("content").GetProperty("application/json");
+            var schema = media.GetProperty("schema");
+            if (schema.TryGetProperty("$ref", out var reference))
+            {
+                schema = document.RootElement.GetProperty("components").GetProperty("schemas")
+                    .GetProperty(reference.GetString()!.Split('/')[^1]);
+            }
+
+            var properties = schema.GetProperty("properties");
+            Assert.True(properties.TryGetProperty("success", out _));
+            Assert.True(properties.TryGetProperty("data", out _));
+            Assert.True(properties.TryGetProperty("error", out _));
+            Assert.Equal(code, media.GetProperty("example").GetProperty("error").GetProperty("code").GetString());
+        }
+
+        var protocol = paths.GetProperty("/connect/fixture").GetProperty("get").GetProperty("responses");
+        Assert.False(protocol.TryGetProperty("404", out _));
+        Assert.False(protocol.TryGetProperty("409", out _));
+    }
+
+    /// <summary>
+    /// Enriches status-only error declarations with the shared envelope and preserves conditional boundary defaults.
+    /// </summary>
+    /// <returns>The native document and actual status-adapter assertions.</returns>
+    [Fact]
+    public async Task StatusOnlyErrorsUseSharedEnvelopeAndExamples()
+    {
+        await using var app = await CreateHost(configure: host =>
+            host.MapGet("/api/admin/v1/status-only", (int count) => Results.StatusCode(StatusCodes.Status409Conflict))
+                .Produces(StatusCodes.Status409Conflict), boundary: true);
+        using var client = app.GetTestClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/openapi/v1.json"));
+        var responses = document.RootElement.GetProperty("paths").GetProperty("/api/admin/v1/status-only")
+            .GetProperty("get").GetProperty("responses");
+
+        // Binding and exception defaults share the same envelope as the explicitly declared business status.
+        foreach (var (status, code) in new[] { ("400", "error_validation"), ("409", "error_conflict"), ("500", "error_internal") })
+        {
+            var media = responses.GetProperty(status).GetProperty("content").GetProperty("application/json");
+            var schema = media.GetProperty("schema");
+            if (schema.TryGetProperty("$ref", out var reference))
+            {
+                schema = document.RootElement.GetProperty("components").GetProperty("schemas")
+                    .GetProperty(reference.GetString()!.Split('/')[^1]);
+            }
+
+            var properties = schema.GetProperty("properties");
+            Assert.True(properties.TryGetProperty("success", out _));
+            Assert.True(properties.TryGetProperty("data", out _));
+            Assert.True(properties.TryGetProperty("error", out _));
+            Assert.Equal(code, media.GetProperty("example").GetProperty("error").GetProperty("code").GetString());
+        }
+
+        using var response = await client.GetAsync("/api/admin/v1/status-only?count=1");
+        using var runtime = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("error_conflict", runtime.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
 
     /// <summary>
@@ -334,7 +414,7 @@ public sealed class OpenApiRegistrationTests
             var endpoint = host.MapPost("/api/admin/v1/contradictory", (Payload request) => TypedResults.Ok(request));
             if (conflictingSchema)
             {
-                endpoint.Produces<OtherPayload>(200);
+                endpoint.Produces<OtherPayload>();
             }
             else
             {
@@ -392,6 +472,7 @@ public sealed class OpenApiRegistrationTests
 
         builder.Services.AddApiInfrastructure("/api/admin/v1", "1.0");
         services?.Invoke(builder.Services);
+        builder.Services.AddOpenApi();
         builder.Services.AddOpenApiInfrastructure(mappings =>
         {
             mappings.Request<Payload, PayloadExample>().Response<Payload, PayloadExample>();
@@ -406,7 +487,7 @@ public sealed class OpenApiRegistrationTests
         if (boundary)
         {
             app.UseCorrelation();
-            app.UseExceptionHandler(new Microsoft.AspNetCore.Builder.ExceptionHandlerOptions
+            app.UseExceptionHandler(new ExceptionHandlerOptions
             {
                 ExceptionHandler = _ => Task.CompletedTask
             });

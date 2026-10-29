@@ -57,6 +57,7 @@ public static class CoreServiceRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        // Share immutable JSON settings; the serializer implementation creates operation-local native state for concurrent callers.
         services.TryAddSingleton<IJsonSerializerService, JsonSerializerService>();
 
         return services;
@@ -93,6 +94,85 @@ public static class CoreServiceRegistration
         services.AddHttpClient();
         services.TryAddTransient<IRestClientMultipleService, RestClientMultipleService>();
         services.TryAddTransient<IThirdPartyApiService, ThirdPartyApiService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Attaches one native resilience pipeline to the selected client, never to all clients globally.
+    /// </summary>
+    /// <param name="builder">The explicitly selected named or typed client.</param>
+    /// <param name="configure">Optional service-owned timeout and safe-retry tuning.</param>
+    /// <returns>The same builder for host composition.</returns>
+    public static IHttpClientBuilder AddHttpResilience(
+        this IHttpClientBuilder builder,
+        Action<HttpStandardResilienceOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        // Streaming callers own body timeouts. Buffered SDK clients configure a finite HttpClient timeout after this registration.
+        builder.ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan);
+
+        builder.AddStandardResilienceHandler(options =>
+        {
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(CoreConstants.HttpVariables.TOTAL_TIMEOUT_SECONDS);
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(CoreConstants.HttpVariables.ATTEMPT_TIMEOUT_SECONDS);
+            options.Retry.MaxRetryAttempts = CoreConstants.HttpVariables.MAX_RETRY_ATTEMPTS;
+            configure?.Invoke(options);
+
+            // Apply this guard last so custom tuning cannot replay mutations, including an MCP POST.
+            options.Retry.DisableForUnsafeHttpMethods();
+        });
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Opts a host into the shared SendGrid adapter without enabling mail for every Core consumer.
+    /// </summary>
+    /// <param name="services">The host-owned container.</param>
+    /// <param name="section">The host-selected email section, including external credentials.</param>
+    /// <returns>The same collection for composition.</returns>
+    public static IServiceCollection AddSendGridEmail(
+        this IServiceCollection services,
+        IConfigurationSection section)
+    {
+        // Bind provider credentials from the caller-selected section; feature content and secret sourcing stay outside shared transport registration.
+        services.AddOptions<SendGridOptions>().Bind(section);
+
+        services.TryAddScoped<IEmailService, SendGridEmailService>();
+
+        // Preserve explicit SDK overrides and avoid adding another handler pipeline on repeated registration.
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(ISendGridClient)))
+        {
+            return services;
+        }
+
+        services.AddHttpClient(CoreConstants.EmailVariables.HTTP_CLIENT_NAME)
+            .RemoveAllLoggers()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false })
+            .AddHttpResilience(options =>
+            {
+                options.CircuitBreaker.MinimumThroughput = CoreConstants.EmailVariables.MINIMUM_THROUGHPUT;
+                options.CircuitBreaker.FailureRatio = CoreConstants.EmailVariables.FAILURE_RATIO;
+                options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(CoreConstants.EmailVariables.SAMPLING_SECONDS);
+                options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(CoreConstants.EmailVariables.BREAK_SECONDS);
+                section.GetSection(CoreConstants.EmailVariables.RESILIENCE_SECTION).Bind(options);
+                // The unsafe-method exclusion is applied after this callback, so mail POST is never retried.
+            })
+            .ConfigureHttpClient((provider, client) =>
+            {
+                // The SDK buffers the body after handlers return. This outer timeout also bounds that native buffering.
+                client.Timeout = provider.GetRequiredService<IOptions<SendGridOptions>>().Value.RequestTimeout;
+            });
+
+        services.TryAddTransient<ISendGridClient>(provider => new SendGridClient(
+            provider.GetRequiredService<IHttpClientFactory>().CreateClient(CoreConstants.EmailVariables.HTTP_CLIENT_NAME),
+            new SendGridClientOptions
+            {
+                ApiKey = provider.GetRequiredService<IOptions<SendGridOptions>>().Value.ApiKey,
+                HttpErrorAsException = false
+            }));
 
         return services;
     }

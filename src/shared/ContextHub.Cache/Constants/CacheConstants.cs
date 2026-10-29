@@ -11,11 +11,6 @@ public static class CacheConstants
     public static class AtomicVariables
     {
         /// <summary>
-        /// Bounds lock storage independently of the number of entries.
-        /// </summary>
-        public const int STRIPE_COUNT = 64;
-
-        /// <summary>
         /// Triggers cleanup every sixty-four operations.
         /// </summary>
         public const int SWEEP_INTERVAL = 64;
@@ -57,6 +52,16 @@ public static class CacheConstants
     /// </summary>
     public static class HybridCacheVariables
     {
+        /// <summary>
+        /// Supplies the shared entry lifetime only when the host has not selected one.
+        /// </summary>
+        public const int DEFAULT_EXPIRATION_SECONDS = 60;
+
+        /// <summary>
+        /// Bounds local staleness independently of the shared entry lifetime.
+        /// </summary>
+        public const int DEFAULT_LOCAL_EXPIRATION_SECONDS = 15;
+
         /// <summary>
         /// Maximum serialized payload size in bytes.
         /// </summary>

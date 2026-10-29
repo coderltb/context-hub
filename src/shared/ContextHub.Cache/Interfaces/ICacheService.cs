@@ -20,11 +20,11 @@ public interface ICacheService
     /// <typeparam name="T">The serializable cache projection.</typeparam>
     /// <param name="key">The capability-owned key.</param>
     /// <param name="factory">The source read; never close over scoped dependencies in a singleton service.</param>
-    /// <param name="policy">The explicit expiration policy.</param>
+    /// <param name="policy">The optional expiration policy; omitted or null uses native host defaults.</param>
     /// <param name="cancellationToken">Cancels this caller; the factory receives the combined caller token.</param>
     /// <returns>The cached or freshly read projection.</returns>
     ValueTask<T> GetOrCreateAsync<T>(CacheKey key, Func<CancellationToken, ValueTask<T>> factory,
-        CacheEntryPolicy policy, CancellationToken cancellationToken = default);
+        CacheEntryPolicy? policy = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Stores explicitly approved data without changing the database authority.
@@ -32,10 +32,10 @@ public interface ICacheService
     /// <typeparam name="T">The serializable cache projection.</typeparam>
     /// <param name="key">The exact entry key.</param>
     /// <param name="value">The approved non-sensitive data.</param>
-    /// <param name="policy">The explicit expiration policy.</param>
+    /// <param name="policy">The optional expiration policy; omitted or null uses native host defaults.</param>
     /// <param name="cancellationToken">Stops the write.</param>
     /// <returns>The cache write operation.</returns>
-    ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryPolicy policy, CancellationToken cancellationToken = default);
+    ValueTask SetAsync<T>(CacheKey key, T value, CacheEntryPolicy? policy = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Removes an exact key from this instance's L1 and the configured L2; other hosts' L1 may live until expiry.

@@ -3,7 +3,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.DependencyInjection;
 /// <summary>
 /// Verifies native Adapt without resolving a mapper or configuration.
 /// </summary>
-[Collection(nameof(Mappings.GlobalMappingCollection))]
+[Collection(nameof(GlobalMappingCollection))]
 public sealed class GlobalMappingStartupTests
 {
     /// <summary>
@@ -15,8 +15,8 @@ public sealed class GlobalMappingStartupTests
         var services = new ServiceCollection();
 
         services.AddMapping();
-        var result = new Mappings.GlobalMappingSource { Name = "sample" }
-            .Adapt<Mappings.GlobalMappingTarget>();
+        var result = new GlobalMappingSource { Name = "sample" }
+            .Adapt<GlobalMappingTarget>();
 
         Assert.Equal("sample", result.DisplayName);
     }

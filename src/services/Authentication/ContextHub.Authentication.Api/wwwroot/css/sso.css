@@ -1,0 +1,111 @@
+/* Local styles cover password sign-in, invitation and email recovery forms. */
+:root {
+    color-scheme: dark;
+    --sso-background: #0b1120;
+    --sso-surface: #111b2e;
+    --sso-input: #0f172a;
+    --sso-input-border: #5b7191;
+    --sso-border: #25324b;
+    --sso-text: #e5edf8;
+    --sso-muted: #9cafc9;
+    --sso-primary: #2563eb;
+    --sso-primary-hover: #1d4ed8;
+    --sso-focus: #60a5fa;
+    --sso-error: #fca5a5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100svh;
+    background: var(--sso-background);
+    color: var(--sso-text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.sso-shell {
+    width: min(100%, 32rem);
+    margin: 0 auto;
+    padding: clamp(2rem, 8vh, 6rem) 1.25rem 2rem;
+}
+
+.sso-card {
+    padding: 2rem;
+    background: var(--sso-surface);
+    border: 1px solid var(--sso-border);
+    border-radius: .75rem;
+}
+
+.sso-header { margin-bottom: 1.5rem; }
+.sso-brand { font-size: 1rem; font-weight: 600; text-decoration: none; }
+
+h1, h2 { color: var(--sso-text); line-height: 1.25; overflow-wrap: anywhere; }
+h1 { margin: 0 0 .875rem; font-size: 2rem; font-weight: 700; letter-spacing: -.035em; }
+h2 { margin: 1.5rem 0 .75rem; font-size: 1.25rem; font-weight: 650; }
+p { margin: 0 0 1.5rem; color: var(--sso-muted); }
+a { color: var(--sso-focus); text-underline-offset: .2em; }
+a:hover { color: var(--sso-text); }
+
+.sso-form { display: grid; gap: 1.5rem; margin: 1.75rem 0 0; }
+.form-field { display: grid; gap: .5rem; }
+label { font-size: .9375rem; font-weight: 600; }
+
+input:not([type="hidden"]) {
+    width: 100%;
+    min-height: 3rem;
+    margin: 0;
+    padding: .75rem .875rem;
+    color: var(--sso-text);
+    background: var(--sso-input);
+    border: 1px solid var(--sso-input-border);
+    border-radius: .5rem;
+    font: inherit;
+}
+
+button {
+    width: 100%;
+    min-height: 3rem;
+    padding: .75rem 1rem;
+    color: #fff;
+    background: var(--sso-primary);
+    border: 1px solid transparent;
+    border-radius: .5rem;
+    font: 600 1rem/1.4 system-ui, sans-serif;
+    cursor: pointer;
+}
+
+button:hover { background: var(--sso-primary-hover); }
+button:disabled { opacity: .6; cursor: wait; }
+
+/* Every keyboard action retains a visible focus indicator, including links outside the form. */
+a:focus-visible, button:focus-visible, input:not([type="hidden"]):focus-visible {
+    outline: 2px solid var(--sso-focus);
+    outline-offset: 3px;
+}
+
+.validation-summary-valid, .field-validation-valid { display: none; }
+.validation-summary-errors, .field-validation-error { color: var(--sso-error); font-size: .9375rem; }
+.validation-summary-errors {
+    padding: .875rem 1rem;
+    border: 1px solid #7f3848;
+    border-radius: .5rem;
+    background: #291a28;
+}
+.validation-summary-errors ul { margin: 0; padding-left: 1.125rem; }
+.input-validation-error { border-color: var(--sso-error) !important; }
+.sso-form + p { margin: 1.5rem 0 0; text-align: center; }
+.sso-card > p:last-child { margin-bottom: 0; }
+
+/* Code-like values must remain readable without overflowing a narrow viewport. */
+code { font-family: ui-monospace, Consolas, monospace; font-size: .9375rem; overflow-wrap: anywhere; }
+
+@media (max-width: 30rem) {
+    .sso-shell { padding: 2rem 1.25rem; }
+    .sso-card { padding: 1.5rem; }
+    h1 { font-size: 1.75rem; }
+}
+

@@ -72,28 +72,13 @@ public sealed class RestClientMultipleService(
         logger.LogDebug(CoreLogConstants.HttpLogs.CLIENT_SELECTED, clientName);
         logger.LogDebug(CoreLogConstants.HttpLogs.SEND_STARTED, request.Method.Method);
 
-        try
-        {
-            // A factory client owns neither the pooled handler nor the unread response returned to the integration.
-            using var client = clientFactory.CreateClient(clientName);
-            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        // Factory clients leave pooled handlers and the returned unread response with their native owners.
+        using var client = clientFactory.CreateClient(clientName);
+        var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
-            logger.LogDebug(CoreLogConstants.HttpLogs.SEND_COMPLETED, request.Method.Method, (int)response.StatusCode);
+        logger.LogDebug(CoreLogConstants.HttpLogs.SEND_COMPLETED, request.Method.Method, (int)response.StatusCode);
 
-            return response;
-        }
-        catch (OperationCanceledException)
-        {
-            // Preserve timeout/cancellation semantics rather than synthesizing a gateway response or retrying unsafe work.
-            logger.LogDebug(CoreLogConstants.HttpLogs.SEND_CANCELLED, clientName, request.Method.Method);
-            throw;
-        }
-        catch (HttpRequestException exception)
-        {
-            // Provider exception messages may include credentials. Log the failure type, then retain the original exception.
-            logger.LogWarning(CoreLogConstants.HttpLogs.SEND_FAILED, clientName, request.Method.Method, exception.GetType().Name);
-            throw;
-        }
+        return response;
     }
 
     /// <summary>
@@ -136,7 +121,7 @@ public sealed class RestClientMultipleService(
 
         if (method != HttpMethod.Get && method != HttpMethod.Delete)
         {
-            request.Content = CreateContent(dto);
+            SetRequestContent(request, dto);
         }
 
         // Native request disposal releases DTO uploads; callers provide a fresh upload for each send.
@@ -144,62 +129,44 @@ public sealed class RestClientMultipleService(
     }
 
     /// <summary>
-    /// Creates native content according to the request media type, including repeated form fields and uploads.
+    /// Assigns native content before configuring it so the request owns construction cleanup.
     /// </summary>
-    /// <param name="dto">The transport DTO containing endpoint, headers, query and payload settings.</param>
-    /// <returns>Native HTTP content whose ownership transfers to the DTO request.</returns>
-    private static HttpContent CreateContent(BaseHttpRequest dto)
+    /// <param name="request">The locally owned request that releases attached content on every exit.</param>
+    /// <param name="dto">The transport fields, media type and optional upload.</param>
+    private static void SetRequestContent(HttpRequestMessage request, BaseHttpRequest dto)
     {
-        // Parameters and casing do not select the payload kind; native content owns its multipart boundary.
+        // Native content selects form encoding and owns its multipart boundary.
         MediaTypeHeaderValue.TryParse(dto.ContentType, out var contentType);
         if (string.Equals(contentType?.MediaType, SharedConstants.HttpVariables.FORM, StringComparison.OrdinalIgnoreCase))
         {
-            return new FormUrlEncodedContent(dto.RequestFormData ?? []);
+            request.Content = new FormUrlEncodedContent(dto.RequestFormData ?? []);
+
+            return;
         }
 
         if (string.Equals(contentType?.MediaType, SharedConstants.HttpVariables.MULTIPART, StringComparison.OrdinalIgnoreCase))
         {
             var multipart = new MultipartFormDataContent();
+            request.Content = multipart;
 
-            try
+            foreach (var field in dto.RequestFormData ?? [])
             {
-                foreach (var field in dto.RequestFormData ?? [])
-                {
-                    multipart.Add(new StringContent(field.Value), field.Key);
-                }
-
-                if (dto.File is not null)
-                {
-                    multipart.Add(dto.File, dto.FileFieldName, dto.FileName);
-                }
-
-                return multipart;
+                multipart.Add(new StringContent(field.Value), field.Key);
             }
-            catch
+
+            if (dto.File is not null)
             {
-                // Failed construction has no request owner yet; release content already attached here.
-                multipart.Dispose();
-                throw;
+                multipart.Add(dto.File, dto.FileFieldName, dto.FileName);
             }
+
+            return;
         }
 
-        HttpContent content = dto.RequestStream is null
+        // Transfer stream ownership before a malformed content header can throw.
+        request.Content = dto.RequestStream is null
             ? new StringContent(dto.RequestData ?? string.Empty, Encoding.UTF8)
             : new StreamContent(dto.RequestStream);
-
-        try
-        {
-            // An invalid header still fails natively, but only after content has taken ownership so the catch releases a DTO stream.
-            content.Headers.ContentType = contentType ?? MediaTypeHeaderValue.Parse(dto.ContentType);
-
-            return content;
-        }
-        catch
-        {
-            // No request owns this content yet; release it and let native disposal failures propagate.
-            content.Dispose();
-            throw;
-        }
+        request.Content.Headers.ContentType = contentType ?? MediaTypeHeaderValue.Parse(dto.ContentType);
     }
 
     /// <summary>
@@ -218,7 +185,11 @@ public sealed class RestClientMultipleService(
         var fragmentIndex = uri.IndexOf('#');
         var fragment = fragmentIndex < 0 ? string.Empty : uri[fragmentIndex..];
         var address = fragmentIndex < 0 ? uri : uri[..fragmentIndex];
-        var separator = address.EndsWith('?') || address.EndsWith('&') ? string.Empty : address.Contains('?') ? "&" : "?";
+        var separator = string.Empty;
+        if (!address.EndsWith('?') && !address.EndsWith('&'))
+        {
+            separator = address.Contains('?') ? "&" : "?";
+        }
         var query = string.Join("&", fields.Select(field => $"{Uri.EscapeDataString(field.Key)}={Uri.EscapeDataString(field.Value)}"));
 
         return address + separator + query + fragment;

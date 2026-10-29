@@ -46,15 +46,18 @@ public sealed class PageResponse<T>
     /// <summary>
     /// Gets the one-based page number.
     /// </summary>
+    /// <example>1</example>
     public int Page { get; }
 
     /// <summary>
     /// Gets the requested page size.
     /// </summary>
+    /// <example>20</example>
     public int PageSize { get; }
 
     /// <summary>
     /// Gets the matching count observed by the count read, not a guaranteed snapshot of the items.
     /// </summary>
+    /// <example>1</example>
     public long TotalCount { get; }
 }

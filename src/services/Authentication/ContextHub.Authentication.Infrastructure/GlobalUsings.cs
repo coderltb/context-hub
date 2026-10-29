@@ -1,0 +1,100 @@
+global using System.Collections.Immutable;
+global using System.Data;
+
+
+global using System.Diagnostics.CodeAnalysis;
+
+global using System.Linq.Expressions;
+global using System.Security.Claims;
+global using System.Security.Cryptography;
+global using System.Text.Json;
+global using System.Text;
+
+global using Mapster;
+
+global using Microsoft.AspNetCore.Authentication;
+global using Microsoft.AspNetCore.Authorization;
+global using Microsoft.AspNetCore.DataProtection;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+global using Microsoft.AspNetCore.Identity;
+global using Microsoft.EntityFrameworkCore.ChangeTracking;
+global using Microsoft.EntityFrameworkCore.Diagnostics;
+global using Microsoft.EntityFrameworkCore.Metadata.Builders;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection.Extensions;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.Extensions.Options;
+global using Microsoft.IdentityModel.Tokens;
+global using OpenIddict.Abstractions;
+global using OpenIddict.EntityFrameworkCore.Models;
+global using OpenIddict.Server;
+global using OpenIddict.Validation.AspNetCore;
+global using Quartz;
+global using StackExchange.Redis;
+global using static OpenIddict.Abstractions.OpenIddictConstants;
+global using static OpenIddict.Server.OpenIddictServerEvents;
+global using static OpenIddict.Server.OpenIddictServerHandlers;
+
+global using ContextHub.Authentication.Application.Constants;
+global using ContextHub.Authentication.Application.Dtos.Accounts;
+global using ContextHub.Authentication.Application.Dtos.Clients;
+global using ContextHub.Authentication.Application.Dtos.Roles;
+global using ContextHub.Authentication.Application.Dtos.Users;
+global using ContextHub.Authentication.Application.Enums;
+global using ContextHub.Authentication.Application.Extensions;
+global using ContextHub.Authentication.Application.Interfaces.Accounts;
+global using ContextHub.Authentication.Application.Interfaces.Clients;
+global using ContextHub.Authentication.Application.Interfaces.Roles;
+global using ContextHub.Authentication.Application.Interfaces.Sessions;
+global using ContextHub.Authentication.Application.Interfaces.Users;
+global using ContextHub.Authentication.Application.Models.Accounts;
+global using ContextHub.Authentication.Application.Models.Clients;
+global using ContextHub.Authentication.Application.Models.Sessions;
+global using ContextHub.Authentication.Application.Models.Users;
+global using ContextHub.Authentication.Domain.Entities;
+global using ContextHub.Authentication.Infrastructure.Constants;
+global using ContextHub.Authentication.Infrastructure.Context;
+global using ContextHub.Authentication.Infrastructure.Handlers.Authorization;
+global using ContextHub.Authentication.Infrastructure.Handlers.Introspection;
+global using ContextHub.Authentication.Infrastructure.Helpers.Clients;
+global using ContextHub.Authentication.Infrastructure.Interceptors;
+global using ContextHub.Authentication.Infrastructure.Interfaces.Repositories.Clients;
+global using ContextHub.Authentication.Infrastructure.Interfaces.Repositories.Users;
+global using ContextHub.Authentication.Application.Interfaces.Identity;
+global using ContextHub.Authentication.Infrastructure.Options;
+global using ContextHub.Authentication.Infrastructure.Repositories.Clients;
+global using ContextHub.Authentication.Infrastructure.Repositories.Users;
+global using ContextHub.Authentication.Infrastructure.Services.Accounts;
+global using ContextHub.Authentication.Infrastructure.Services.Clients;
+global using ContextHub.Authentication.Infrastructure.Services.Identity;
+global using ContextHub.Authentication.Infrastructure.Services.Roles;
+global using ContextHub.Authentication.Infrastructure.Services.Sessions;
+global using ContextHub.Authentication.Infrastructure.Services.Users;
+global using ContextHub.Cache.DependencyInjection;
+global using ContextHub.Cache.Interfaces;
+global using ContextHub.Cache.Models;
+global using ContextHub.Core.DependencyInjection;
+global using ContextHub.Core.Exceptions;
+global using ContextHub.Core.Helpers.Persistence;
+global using ContextHub.Core.Interceptors.Auditing;
+global using ContextHub.Core.Interfaces.Auditing;
+global using ContextHub.Core.Interfaces.Caches;
+global using ContextHub.Core.Interfaces.Email;
+global using ContextHub.Core.Interfaces.Persistence;
+global using ContextHub.Core.Queries;
+global using ContextHub.Core.Repositories;
+global using ContextHub.Shared.Dtos.Options.Persistence;
+global using ContextHub.Shared.Dtos.Requests.Emails;
+global using ContextHub.Shared.Dtos.Requests;
+global using ContextHub.Shared.Dtos.Responses;
+global using ContextHub.Shared.Enums;
+
+global using ContextHub.Shared.Helpers.Security;
+
+global using CurrentOwnerAuthorizationContext = Microsoft.AspNetCore.Authorization.AuthorizationHandlerContext;
+
+global using AuthenticationOptions = ContextHub.Authentication.Infrastructure.Options.AuthenticationOptions;

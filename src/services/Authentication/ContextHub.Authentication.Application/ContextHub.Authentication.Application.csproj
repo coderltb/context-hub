@@ -1,12 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <ItemGroup>
+        <!-- Analysis-only contracts are omitted from compiled assemblies and runtime dependencies. -->
+        <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" IncludeAssets="compile;build;analyzers" />
+      <PackageReference Include="Mediator.SourceGenerator" Version="3.0.2" PrivateAssets="all" />
+      <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
       <ProjectReference Include="..\..\..\shared\ContextHub.Core\ContextHub.Core.csproj" />
       <ProjectReference Include="..\..\..\shared\ContextHub.Shared\ContextHub.Shared.csproj" />
       <ProjectReference Include="..\ContextHub.Authentication.Domain\ContextHub.Authentication.Domain.csproj" />

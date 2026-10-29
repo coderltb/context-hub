@@ -20,10 +20,8 @@ public sealed class CorrelationIdHandlerTests
         var context = new DefaultHttpContext();
         context.Items[ApiCommonConstants.CORRELATION_ID] = contextual;
         using var terminal = new CaptureHandler();
-        using var handler = new CorrelationIdHandler(new HttpContextAccessor { HttpContext = context }, NullLogger<CorrelationIdHandler>.Instance)
-        {
-            InnerHandler = terminal
-        };
+        using var handler = new CorrelationIdHandler(new HttpContextAccessor { HttpContext = context }, NullLogger<CorrelationIdHandler>.Instance);
+        handler.InnerHandler = terminal;
         using var invoker = new HttpMessageInvoker(handler);
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.invalid/resource");
         if (explicitHeader)
@@ -45,10 +43,8 @@ public sealed class CorrelationIdHandlerTests
     {
         var logger = new TestLogger<CorrelationIdHandler>();
         using var terminal = new CaptureHandler();
-        using var handler = new CorrelationIdHandler(new HttpContextAccessor(), logger)
-        {
-            InnerHandler = terminal
-        };
+        using var handler = new CorrelationIdHandler(new HttpContextAccessor(), logger);
+        handler.InnerHandler = terminal;
         using var invoker = new HttpMessageInvoker(handler);
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.invalid/");
         request.Headers.Add(ApiCommonConstants.CORRELATION_ID, "private-invalid-value");
@@ -72,10 +68,8 @@ public sealed class CorrelationIdHandlerTests
         using var activity = new Activity("Background operation").Start();
         activity.SetBaggage(ApiCommonConstants.CORRELATION_ID, correlationId);
         using var terminal = new CaptureHandler();
-        using var handler = new CorrelationIdHandler(new HttpContextAccessor(), NullLogger<CorrelationIdHandler>.Instance)
-        {
-            InnerHandler = terminal
-        };
+        using var handler = new CorrelationIdHandler(new HttpContextAccessor(), NullLogger<CorrelationIdHandler>.Instance);
+        handler.InnerHandler = terminal;
         using var invoker = new HttpMessageInvoker(handler);
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.invalid/");
 
@@ -92,14 +86,12 @@ public sealed class CorrelationIdHandlerTests
     public async Task SendAsync_CancelledCaller_PropagatesCancellation()
     {
         using var terminal = new CaptureHandler();
-        using var handler = new CorrelationIdHandler(new HttpContextAccessor(), NullLogger<CorrelationIdHandler>.Instance)
-        {
-            InnerHandler = terminal
-        };
+        using var handler = new CorrelationIdHandler(new HttpContextAccessor(), NullLogger<CorrelationIdHandler>.Instance);
+        handler.InnerHandler = terminal;
         using var invoker = new HttpMessageInvoker(handler);
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://example.invalid/");
         using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
+        await cancellation.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => invoker.SendAsync(request, cancellation.Token));
     }

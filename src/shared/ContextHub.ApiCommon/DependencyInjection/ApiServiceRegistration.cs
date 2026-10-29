@@ -25,8 +25,11 @@ public static class ApiServiceRegistration
         // One immutable host-owned boundary is shared by runtime responses and generated documentation.
         var boundary = new ApiResponseBoundary(routePrefix, apiVersion);
         services.AddSingleton(boundary);
+        services.AddJsonSerializer();
         services.AddCorrelation();
         services.AddHttpContextAccessor();
+
+        // Read per-request identity/device data through scoped accessors; factories below retain no request-owned state.
         services.TryAddScoped<IClientDeviceContextAccessor, ClientDeviceContextAccessor>();
         services.TryAddSingleton<ApiResponseMetadataFactory>();
         services.TryAddSingleton<ApiErrorResponseFactory>();
@@ -37,13 +40,17 @@ public static class ApiServiceRegistration
         services.Configure<ExceptionHandlerOptions>(options => options.SuppressDiagnosticsCallback = context =>
             boundary.Contains(context.HttpContext.Request.Path));
 
+        // Run DTO diagnostics outside result adaptation, then attach the same metadata boundary to completed MVC responses.
         services.Configure<MvcOptions>(options =>
         {
             // MVC sorts the registered TypeFilter wrapper, so its order must also precede native error mapping.
+            options.Filters.Add<ApiLoggingFilter>(ApiCommonConstants.API_LOGGING_FILTER_ORDER);
             options.Filters.Add<ApiErrorResponseFilter>(ApiCommonConstants.API_ERROR_FILTER_ORDER);
             options.Filters.Add<ApiResponseMetadataFilter>();
         });
-        services.Configure<ApiBehaviorOptions>(options =>
+
+        // MVC initializes its factory during Configure; apply this boundary afterward regardless of host registration order.
+        services.PostConfigure<ApiBehaviorOptions>(options =>
         {
             // Preserve MVC's original response behavior for Razor/OIDC and other out-of-boundary routes.
             var nativeFactory = options.InvalidModelStateResponseFactory;
@@ -89,7 +96,7 @@ public static class ApiServiceRegistration
         ArgumentNullException.ThrowIfNull(services);
 
         // Correlation is useful on MCP and scaffold routes too; it must not change their response contracts.
-        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.TryAddSingleton(TimeProvider.System);
 
         return services;
     }
@@ -102,6 +109,7 @@ public static class ApiServiceRegistration
     /// <returns>The same service collection.</returns>
     public static IServiceCollection AddHttpAudit(this IServiceCollection services, Action<CurrentUserOptions>? configure = null)
     {
+        // Reuse the selected authenticated principal as the audit actor; feature bodies cannot supply their own actor identifier.
         services.AddCurrentUser(configure);
         services.TryAddScoped<IAuditActorAccessor, HttpAuditActorAccessor>();
         services.AddAudit();
@@ -199,8 +207,8 @@ public static class ApiServiceRegistration
         // Store only a frozen type/status snapshot; providers are activated later through the document's DI services.
         services.AddSingleton(registration.Build());
 
-        // Native OpenAPI registration generates documentation only. Runtime error middleware remains host-owned.
-        services.AddOpenApi(documentName, options => options.AddApiExamples());
+        // The host calls AddOpenApi directly so its XML documentation generator sees the application assembly.
+        services.Configure<OpenApiOptions>(documentName, options => options.AddApiExamples());
 
         return services;
     }
@@ -214,7 +222,8 @@ public static class ApiServiceRegistration
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return options.AddOperationTransformer<ApiContractOperationTransformer>()
+        return options.AddSchemaTransformer<ApiEnvelopeSchemaTransformer>()
+            .AddOperationTransformer<ApiContractOperationTransformer>()
             .AddOperationTransformer<ApiExamplesOperationTransformer>()
             .AddOperationTransformer<ApiValueExamplesOperationTransformer>();
     }

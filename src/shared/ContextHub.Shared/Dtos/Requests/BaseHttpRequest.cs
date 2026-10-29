@@ -3,6 +3,7 @@ namespace ContextHub.Shared.Dtos.Requests;
 /// <summary>
 /// Groups named-client REST request data without workspace, framework or credential-storage behavior.
 /// </summary>
+[PublicAPI]
 public sealed class BaseHttpRequest
 {
     /// <summary>

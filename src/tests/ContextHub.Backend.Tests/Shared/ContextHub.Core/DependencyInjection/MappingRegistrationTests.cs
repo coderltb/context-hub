@@ -3,7 +3,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.DependencyInjection;
 /// <summary>
 /// Verifies startup compilation, process-wide mapping and local customization without DI-owned mapping state.
 /// </summary>
-[Collection(nameof(Mappings.GlobalMappingCollection))]
+[Collection(nameof(GlobalMappingCollection))]
 public sealed class MappingRegistrationTests
 {
     /// <summary>
@@ -14,7 +14,7 @@ public sealed class MappingRegistrationTests
     {
         new ServiceCollection().AddMapping();
 
-        var result = new Mappings.GlobalMappingSource { Name = "sample" }.Adapt<ConventionTarget>();
+        var result = new GlobalMappingSource { Name = "sample" }.Adapt<ConventionTarget>();
 
         Assert.Equal("sample", result.Name);
     }
@@ -30,7 +30,7 @@ public sealed class MappingRegistrationTests
         using var firstHost = first.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
         using var secondHost = second.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
 
-        var result = new Mappings.GlobalMappingSource { Name = "shared" }.Adapt<Mappings.GlobalMappingTarget>();
+        var result = new GlobalMappingSource { Name = "shared" }.Adapt<GlobalMappingTarget>();
 
         Assert.Equal("shared", result.DisplayName);
         Assert.Empty(first);
@@ -59,8 +59,8 @@ public sealed class MappingRegistrationTests
         }
 
         services.AddMapping();
-        Assert.Equal("recovered", new Mappings.GlobalMappingSource { Name = "recovered" }
-            .Adapt<Mappings.GlobalMappingTarget>().DisplayName);
+        Assert.Equal("recovered", new GlobalMappingSource { Name = "recovered" }
+            .Adapt<GlobalMappingTarget>().DisplayName);
     }
 
     /// <summary>
@@ -70,12 +70,12 @@ public sealed class MappingRegistrationTests
     public void Services_DoNotRescanOrCompileMapping()
     {
         var services = new ServiceCollection().AddMapping();
-        var compiled = TypeAdapterConfig.GlobalSettings.GetMapFunction<Mappings.GlobalMappingSource, Mappings.GlobalMappingTarget>();
+        var compiled = TypeAdapterConfig.GlobalSettings.GetMapFunction<GlobalMappingSource, GlobalMappingTarget>();
 
         services.AddRestClients().AddRestClients();
         services.AddPersistence<StandaloneContext>().AddPersistence<StandaloneContext>();
 
-        Assert.Same(compiled, TypeAdapterConfig.GlobalSettings.GetMapFunction<Mappings.GlobalMappingSource, Mappings.GlobalMappingTarget>());
+        Assert.Same(compiled, TypeAdapterConfig.GlobalSettings.GetMapFunction<GlobalMappingSource, GlobalMappingTarget>());
         Assert.DoesNotContain(services, descriptor =>
             descriptor.ServiceType == typeof(TypeAdapterConfig) ||
             descriptor.ServiceType == typeof(IMapper) ||
@@ -90,13 +90,13 @@ public sealed class MappingRegistrationTests
     public void LocalConfiguration_DoesNotMutateGlobalMapping()
     {
         new ServiceCollection().AddMapping();
-        var input = new Mappings.GlobalMappingSource { Name = "sample" };
+        var input = new GlobalMappingSource { Name = "sample" };
         var local = new TypeAdapterConfig();
-        local.NewConfig<Mappings.GlobalMappingSource, Mappings.GlobalMappingTarget>()
+        local.NewConfig<GlobalMappingSource, GlobalMappingTarget>()
             .Map(destination => destination.DisplayName, source => "local:" + source.Name);
 
-        var custom = input.Adapt<Mappings.GlobalMappingTarget>(local);
-        var ordinary = input.Adapt<Mappings.GlobalMappingTarget>();
+        var custom = input.Adapt<GlobalMappingTarget>(local);
+        var ordinary = input.Adapt<GlobalMappingTarget>();
 
         Assert.Equal("local:sample", custom.DisplayName);
         Assert.Equal("sample", ordinary.DisplayName);
@@ -116,7 +116,10 @@ public sealed class MappingRegistrationTests
     /// <summary>
     /// Isolates the invalid mapping from all production and stable fixture pairs.
     /// </summary>
-    public sealed class InvalidSource;
+    public sealed class InvalidSource
+    {
+        // No source member may satisfy the destination in this negative mapping scenario.
+    }
 
     /// <summary>
     /// Requires a member that the negative case cannot obtain from its source.
@@ -132,5 +135,8 @@ public sealed class MappingRegistrationTests
     /// <summary>
     /// Provides a persistence registration type without opening or configuring a database.
     /// </summary>
-    private sealed class StandaloneContext : DbContext;
+    private sealed class StandaloneContext : DbContext
+    {
+        // Composition is tested without opening or configuring a database.
+    }
 }

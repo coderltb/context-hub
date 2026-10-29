@@ -13,7 +13,7 @@ public sealed class AtomicCacheServiceTests
     public async Task InvalidCounter_DoesNotSilentlyReplaceItsValue()
     {
         var cache = new InMemoryAtomicCacheService(TimeProvider.System, NullLogger<InMemoryAtomicCacheService>.Instance);
-        await cache.TrySetIfAbsentAsync("counter", long.MaxValue.ToString(global::System.Globalization.CultureInfo.InvariantCulture), TimeSpan.FromMinutes(1));
+        await cache.TrySetIfAbsentAsync("counter", long.MaxValue.ToString(CultureInfo.InvariantCulture), TimeSpan.FromMinutes(1));
         await Assert.ThrowsAsync<OverflowException>(() => cache.IncrementAsync("counter", TimeSpan.FromMinutes(1)));
         Assert.False(await cache.TrySetIfAbsentAsync("counter", "new", TimeSpan.FromMinutes(1)));
 
@@ -23,13 +23,23 @@ public sealed class AtomicCacheServiceTests
     }
 
     /// <summary>
-    /// Allows exactly one reservation and serializes concurrent increments.
+    /// Allows exactly one reservation and preserves concurrent increments for absent or expired entries.
     /// </summary>
+    /// <param name="expired">Whether workers replace entries whose fixed lifetime has elapsed.</param>
     /// <returns>The asynchronous concurrency assertions.</returns>
-    [Fact]
-    public async Task ConcurrentOperations_DoNotLoseUpdates()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ConcurrentOperations_DoNotLoseUpdates(bool expired)
     {
-        var cache = new InMemoryAtomicCacheService(TimeProvider.System, NullLogger<InMemoryAtomicCacheService>.Instance);
+        var clock = new ManualClock();
+        var cache = new InMemoryAtomicCacheService(clock, NullLogger<InMemoryAtomicCacheService>.Instance);
+        if (expired)
+        {
+            await cache.TrySetIfAbsentAsync("reservation", "old", TimeSpan.FromSeconds(1));
+            await cache.IncrementAsync("counter", TimeSpan.FromSeconds(1));
+            clock.Advance(TimeSpan.FromSeconds(1));
+        }
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var waiting = 0;
@@ -93,6 +103,7 @@ public sealed class AtomicCacheServiceTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => cache.IncrementAsync("key", TimeSpan.Zero));
         await Assert.ThrowsAnyAsync<ArgumentException>(() => cache.RemoveAsync(" "));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cache.IncrementAsync("key", TimeSpan.FromSeconds(1), new CancellationToken(true)));
+        Assert.Equal(1, await cache.IncrementAsync("key", TimeSpan.FromSeconds(1)));
     }
 
     /// <summary>
@@ -103,7 +114,7 @@ public sealed class AtomicCacheServiceTests
         /// <summary>
         /// Stores the simulated UTC instant.
         /// </summary>
-        private DateTimeOffset _now = DateTimeOffset.Parse("2026-10-06T00:00:00Z", global::System.Globalization.CultureInfo.InvariantCulture);
+        private DateTimeOffset _now = DateTimeOffset.Parse("2026-10-06T00:00:00Z", CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Returns the current simulated instant.

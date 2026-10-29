@@ -3,7 +3,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.Services.Http;
 /// <summary>
 /// Exercises the reference DTO facade with real DI, Mapster, Newtonsoft and a native handler boundary.
 /// </summary>
-[Collection(nameof(Mappings.GlobalMappingCollection))]
+[Collection(nameof(GlobalMappingCollection))]
 public sealed class ThirdPartyApiServiceTests
 {
     /// <summary>
@@ -62,12 +62,12 @@ public sealed class ThirdPartyApiServiceTests
         var output = await scope.ServiceProvider.GetRequiredService<IThirdPartyApiService>().HandleApiData(request);
 
         Assert.Equal("Authorization: ***MASKED***; Authorization: ***MASKED***; password='***MASKED***'; path=/reports", output);
-        Assert.All(logger.Entries, entry =>
+        foreach (var entry in logger.Entries)
         {
             Assert.DoesNotContain("bearer-secret", entry.Message);
             Assert.DoesNotContain("basic-secret", entry.Message);
             Assert.DoesNotContain("quoted secret", entry.Message);
-        });
+        }
     }
 
     /// <summary>
@@ -123,11 +123,11 @@ public sealed class ThirdPartyApiServiceTests
         Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Information && entry.Message.Contains("request-marker", StringComparison.Ordinal));
         Assert.Contains(logger.Entries, entry => entry.Level == (status == 200 ? LogLevel.Information : LogLevel.Error) &&
                                                 entry.Message.Contains("response-marker", StringComparison.Ordinal));
-        Assert.All(logger.Entries, entry =>
+        foreach (var entry in logger.Entries)
         {
             Assert.DoesNotContain("-secret", entry.Message);
             Assert.Null(entry.Exception);
-        });
+        }
 
         Assert.Contains(logger.Entries, entry => entry.Message.Contains("private-endpoint", StringComparison.Ordinal));
     }
@@ -272,11 +272,11 @@ public sealed class ThirdPartyApiServiceTests
         Assert.Equal(HttpStatusCode.Conflict, error.StatusCode);
         Assert.DoesNotContain("private-token", error.Message);
         Assert.NotEmpty(logger.Entries);
-        Assert.All(logger.Entries, entry =>
+        foreach (var entry in logger.Entries)
         {
             Assert.DoesNotContain("private-token", entry.Message);
             Assert.Null(entry.Exception);
-        });
+        }
     }
 
     /// <summary>
@@ -431,7 +431,10 @@ public sealed class ThirdPartyApiServiceTests
     /// <summary>
     /// Defines a feature request extending the reusable integration contract.
     /// </summary>
-    public sealed class IntegrationRequest : BaseThirdPartyApiRequest;
+    public sealed class IntegrationRequest : BaseThirdPartyApiRequest
+    {
+        // The feature reuses every transport member without introducing another request shape.
+    }
 
     /// <summary>
     /// Verifies that serialization honors a feature property's explicit Newtonsoft exclusion.

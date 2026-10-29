@@ -56,10 +56,10 @@ public sealed class CorrelationMiddleware(
 
         using var scope = logger.BeginScope(new Dictionary<string, object>
         {
-            ["CorrelationId"] = correlationId,
-            ["RequestId"] = context.TraceIdentifier,
-            ["TraceId"] = activity.TraceId.ToString(),
-            ["SpanId"] = activity.SpanId.ToString()
+            [SharedConstants.LoggingVariables.CORRELATION_ID_PROPERTY] = correlationId,
+            [SharedConstants.LoggingVariables.REQUEST_ID_PROPERTY] = context.TraceIdentifier,
+            [SharedConstants.LoggingVariables.TRACE_ID_PROPERTY] = activity.TraceId.ToString(),
+            [SharedConstants.LoggingVariables.SPAN_ID_PROPERTY] = activity.SpanId.ToString()
         });
 
         logger.LogDebug(

@@ -86,7 +86,7 @@ public sealed class JsonSerializerService : IJsonSerializerService
 
             return !string.IsNullOrWhiteSpace(json);
         }
-        catch (Newtonsoft.Json.JsonException)
+        catch (JsonException)
         {
             // External JSON and native exception messages can include private data. Return no diagnostic payload.
             value = default;
@@ -121,7 +121,7 @@ public sealed class JsonSerializerService : IJsonSerializerService
         /// <param name="member">The CLR member whose JSON property contract is being constructed.</param>
         /// <param name="memberSerialization">The native Newtonsoft member-selection policy.</param>
         /// <returns>The native JSON property contract retaining ignore/converter rules.</returns>
-        protected override Newtonsoft.Json.Serialization.JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+        protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
         {
             var property = base.CreateProperty(member, memberSerialization);
 

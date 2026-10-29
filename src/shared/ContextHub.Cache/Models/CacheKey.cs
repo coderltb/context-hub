@@ -50,8 +50,10 @@ public sealed record CacheKey
         }
 
         ArgumentNullException.ThrowIfNull(parts);
+        // Runtime input may contain null elements despite the caller-facing non-null contract.
+        IEnumerable<string?> rawParts = parts;
         if (parts.Length is < 1 or > CacheConstants.KeyVariables.MAX_PARTS ||
-            parts.Any(part => part is null || part.Length > CacheConstants.KeyVariables.MAX_PART_LENGTH))
+            rawParts.Any(part => part is null || part.Length > CacheConstants.KeyVariables.MAX_PART_LENGTH))
         {
             throw new ArgumentException(CacheErrorConstants.PolicyErrors.PARTS_INVALID, nameof(parts));
         }

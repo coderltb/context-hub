@@ -3,7 +3,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.DependencyInjection;
 /// <summary>
 /// Exercises shared composition through startup mapping, DI-managed serialization, transport and authorization.
 /// </summary>
-[Collection(nameof(Mappings.GlobalMappingCollection))]
+[Collection(nameof(GlobalMappingCollection))]
 public sealed class CoreInfrastructureTests
 {
     /// <summary>
@@ -20,7 +20,7 @@ public sealed class CoreInfrastructureTests
             ValidateScopes = true,
             ValidateOnBuild = true
         });
-        var result = new Mappings.GlobalMappingSource { Name = "sample" }.Adapt<Mappings.GlobalMappingTarget>();
+        var result = new GlobalMappingSource { Name = "sample" }.Adapt<GlobalMappingTarget>();
 
         Assert.Equal("sample", result.DisplayName);
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IMapper));
@@ -38,12 +38,12 @@ public sealed class CoreInfrastructureTests
             .ToArray();
 
         Assert.NotEmpty(profiles);
-        Assert.All(profiles, type =>
+        foreach (var type in profiles)
         {
             Assert.True(type.IsVisible);
             Assert.False(type.ContainsGenericParameters);
             Assert.NotNull(type.GetConstructor(Type.EmptyTypes));
-        });
+        }
     }
 
     /// <summary>
@@ -71,7 +71,7 @@ public sealed class CoreInfrastructureTests
         });
         using var scope = provider.CreateScope();
 
-        var mapped = new Mappings.GlobalMappingSource { Name = "sample" }.Adapt<Mappings.GlobalMappingTarget>();
+        var mapped = new GlobalMappingSource { Name = "sample" }.Adapt<GlobalMappingTarget>();
         var json = scope.ServiceProvider.GetRequiredService<IJsonSerializerService>().Serialize(mapped);
         using var response = await scope.ServiceProvider.GetRequiredService<IRestClientMultipleService>()
             .PostAsync(new BaseHttpRequest { HttpClientName = "test", RequestUri = "/work", RequestData = json });

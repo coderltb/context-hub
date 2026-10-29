@@ -91,6 +91,7 @@ public sealed class RoutingRegistrationTests
         }
 
         builder.Services.AddApiInfrastructure("/api", "1.0");
+        builder.Services.AddOpenApi();
         builder.Services.AddOpenApiInfrastructure(_ => { });
 
         var app = builder.Build();

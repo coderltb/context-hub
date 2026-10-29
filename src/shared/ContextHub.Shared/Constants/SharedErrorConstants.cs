@@ -41,4 +41,15 @@ public static class SharedErrorConstants
         /// </summary>
         public const string ITEM_COUNT_INVALID = "Item count exceeds the page size.";
     }
+
+    /// <summary>
+    /// Safe errors from typed query configuration without field values or search keywords.
+    /// </summary>
+    public static class QueryErrors
+    {
+        /// <summary>
+        /// Requires explicit valid text fields rather than silently dropping an active search.
+        /// </summary>
+        public const string TEXT_FIELDS_REQUIRED = "An active text search requires at least one valid string selector.";
+    }
 }

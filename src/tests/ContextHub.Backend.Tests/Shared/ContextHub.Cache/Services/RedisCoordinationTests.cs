@@ -51,8 +51,8 @@ public sealed class RedisCoordinationTests : IAsyncLifetime
         await atomic.RemoveAsync("reserve");
         Assert.True(await atomic.TrySetIfAbsentAsync("reserve", "new", TimeSpan.FromSeconds(5)));
 
-        var native = provider.GetRequiredService<Microsoft.Extensions.Caching.Distributed.IDistributedCache>();
-        await native.SetAsync("hybrid-check", [1], new Microsoft.Extensions.Caching.Distributed.DistributedCacheEntryOptions
+        var native = provider.GetRequiredService<IDistributedCache>();
+        await native.SetAsync("hybrid-check", [1], new DistributedCacheEntryOptions
             { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(1) });
         Assert.Equal(new byte[] { 1 }, await native.GetAsync("hybrid-check"));
     }
@@ -102,8 +102,9 @@ public sealed class RedisCoordinationTests : IAsyncLifetime
 
         // A real command observes the outage; IsConnected alone can retain its last state until network activity detects it.
         var atomicError = await Record.ExceptionAsync(() => atomic.IncrementAsync("count", TimeSpan.FromSeconds(5)));
+        var failureType = atomicError?.GetType().Name ?? "no exception";
         Assert.True(atomicError is RedisConnectionException or RedisTimeoutException,
-            $"Expected a Redis connection or timeout failure, received {atomicError?.GetType().Name ?? "no exception"}.");
+            $"Expected a Redis connection or timeout failure, received {failureType}.");
 
         // Keep the native acquisition budget above the configured command timeout, so this checks failure rather than budget exhaustion.
         var error = await Assert.ThrowsAsync<DistributedLockUnavailableException>(() => locks.TryAcquireAsync("work", TimeSpan.FromSeconds(20)));
@@ -113,19 +114,30 @@ public sealed class RedisCoordinationTests : IAsyncLifetime
     /// <summary>
     /// Exposes native lease loss when the owned Redis key is removed externally.
     /// </summary>
+    /// <param name="acquisitionDelayMilliseconds">The controlled server delay before acquisition.</param>
     /// <returns>The loss notification and native disposal assertions.</returns>
-    [Fact]
-    public async Task LockLease_ReportsLossThroughNativeToken()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(300)]
+    public async Task LockLease_ReportsLossThroughNativeToken(int acquisitionDelayMilliseconds)
     {
-        using var connection = await ConnectionMultiplexer.ConnectAsync(_redis.GetConnectionString());
+        var options = ConfigurationOptions.Parse(_redis.GetConnectionString());
+        options.AllowAdmin = true;
+        using var connection = await ConnectionMultiplexer.ConnectAsync(options);
+        if (acquisitionDelayMilliseconds > 0)
+        {
+            // Delay only this disposable Redis server; budget exhaustion is a separate contract.
+            await connection.GetDatabase().ExecuteAsync("CLIENT", "PAUSE", acquisitionDelayMilliseconds, "WRITE");
+        }
         var service = new DistributedLockService(connection, NullLogger<DistributedLockService>.Instance);
-        await using var lease = await service.TryAcquireAsync("lost-lease", TimeSpan.FromSeconds(1));
+        // Native minimum validity reserves 90% of expiry; leave acquisition time for server latency.
+        await using var lease = await service.TryAcquireAsync("lost-lease", TimeSpan.FromSeconds(20));
         Assert.NotNull(lease);
         var lost = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = lease.HandleLostToken.Register(() => lost.TrySetResult());
 
-        await connection.GetDatabase().KeyDeleteAsync("lost-lease");
-        await lost.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.True(await connection.GetDatabase().KeyDeleteAsync("lost-lease"));
+        await lost.Task.WaitAsync(TimeSpan.FromSeconds(15));
 
         Assert.True(lease.HandleLostToken.IsCancellationRequested);
     }

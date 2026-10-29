@@ -87,7 +87,8 @@ public sealed class RestClientMultipleServiceTests
         services.AddHttpClient("native").ConfigurePrimaryHttpMessageHandler(() => handler);
         await using var provider = services.BuildServiceProvider();
         var transport = provider.GetRequiredService<IRestClientMultipleService>();
-        using var request = new HttpRequestMessage(new HttpMethod(method), "https://example.invalid/resource") { Content = CreateContent(kind) };
+        using var request = new HttpRequestMessage(new HttpMethod(method), "https://example.invalid/resource");
+        request.Content = CreateContent(kind);
 
         using var response = await transport.SendAsync("native", request);
 
@@ -145,7 +146,8 @@ public sealed class RestClientMultipleServiceTests
         services.AddSingleton<ILogger<RestClientMultipleService>>(logger);
         await using var provider = services.BuildServiceProvider();
         var transport = provider.GetRequiredService<IRestClientMultipleService>();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://example.invalid/private?token=secret") { Content = new StringContent("private-body") };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://example.invalid/private?token=secret");
+        request.Content = new StringContent("private-body");
 
         using var response = await transport.SendAsync("upstream", request);
 
@@ -154,12 +156,12 @@ public sealed class RestClientMultipleServiceTests
         Assert.False(body.Disposed);
         Assert.Equal("upstream-body", await response.Content.ReadAsStringAsync());
         Assert.Equal("private-body", await request.Content.ReadAsStringAsync());
-        Assert.All(logger.Entries, entry =>
+        foreach (var entry in logger.Entries)
         {
             Assert.DoesNotContain("private", entry.Message, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("secret", entry.Message, StringComparison.OrdinalIgnoreCase);
             Assert.Null(entry.Exception);
-        });
+        }
     }
 
     /// <summary>
@@ -181,13 +183,12 @@ public sealed class RestClientMultipleServiceTests
         var actual = await Assert.ThrowsAsync<HttpRequestException>(() => transport.SendAsync("upstream", request));
 
         Assert.Same(failure, actual);
-        Assert.Contains(logger.Entries, entry => entry.Level == LogLevel.Warning &&
-            entry.Message.Contains("transport failed", StringComparison.OrdinalIgnoreCase));
-        Assert.All(logger.Entries, entry =>
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
+        foreach (var entry in logger.Entries)
         {
             Assert.DoesNotContain("private-token", entry.Message, StringComparison.Ordinal);
             Assert.Null(entry.Exception);
-        });
+        }
     }
 
     /// <summary>
@@ -238,7 +239,7 @@ public sealed class RestClientMultipleServiceTests
         await cancellation.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
-        Assert.Contains(logger.Entries, entry => entry.Message.Contains("cancelled", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("cancelled", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

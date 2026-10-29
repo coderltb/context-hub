@@ -60,11 +60,11 @@ public sealed class SharedSourceConventionsTests
         foreach (var type in assemblies.SelectMany(assembly => assembly.GetTypes())
                      .Where(type => type.Namespace?.EndsWith(".Constants", StringComparison.Ordinal) == true))
         {
-            Assert.Empty(type.GetMethods(System.Reflection.BindingFlags.DeclaredOnly |
-                                         System.Reflection.BindingFlags.Public |
-                                         System.Reflection.BindingFlags.NonPublic |
-                                         System.Reflection.BindingFlags.Static |
-                                         System.Reflection.BindingFlags.Instance));
+            Assert.Empty(type.GetMethods(BindingFlags.DeclaredOnly |
+                                         BindingFlags.Public |
+                                         BindingFlags.NonPublic |
+                                         BindingFlags.Static |
+                                         BindingFlags.Instance));
         }
     }
 
@@ -151,7 +151,7 @@ public sealed class SharedSourceConventionsTests
         }
 
         Assert.NotNull(directory);
-        var sourceRoot = Path.Combine(directory!.FullName, "src");
+        var sourceRoot = Path.Combine(directory.FullName, "src");
 
         var roots = includeServices
             ? new[] { sourceRoot }

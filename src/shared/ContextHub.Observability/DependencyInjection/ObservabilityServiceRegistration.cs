@@ -53,18 +53,22 @@ public static class ObservabilityServiceRegistration
         ValidateServiceName(serviceName);
         ArgumentException.ThrowIfNullOrWhiteSpace(environmentName);
 
+        // Bind startup console format, level and category overrides from Observability:Logging before constructing this host's logger.
         services.AddOptions<LoggingOptions>()
             .Bind(configuration.GetSection(ObservabilityConstants.LOGGING_SECTION))
-            .Validate(options => options.ConsoleFormat is ObservabilityConstants.COMPACT_JSON or ObservabilityConstants.TEXT or ObservabilityConstants.BOTH,
+            .Validate(options => Enum.IsDefined(options.ConsoleFormat),
                 ObservabilityErrorConstants.INVALID_CONSOLE_FORMAT)
             .Validate(options => Enum.IsDefined(options.MinimumLevel), ObservabilityErrorConstants.INVALID_LOG_LEVEL)
             .Validate(options => options.MinimumLevelOverrides is not null && options.MinimumLevelOverrides.All(pair =>
                     !string.IsNullOrWhiteSpace(pair.Key) && Enum.IsDefined(pair.Value)),
                 ObservabilityErrorConstants.INVALID_LOG_LEVEL_OVERRIDES)
             .ValidateOnStart();
+
+        // Route framework logging through the one Serilog pipeline instead of keeping duplicate console providers.
         services.AddLogging(builder => builder.ClearProviders());
         services.AddSerilog((provider, logger) =>
         {
+            // Resolve the validated startup settings from DI; native sinks still apply the shared masking formatter.
             var options = provider.GetRequiredService<IOptions<LoggingOptions>>().Value;
             logger.MinimumLevel.Is(options.MinimumLevel)
                 .Enrich.FromLogContext()
@@ -72,16 +76,16 @@ public static class ObservabilityServiceRegistration
                 .Enrich.WithProperty(ObservabilityConstants.SERVICE_NAME, serviceName)
                 .Enrich.WithProperty(ObservabilityConstants.ENVIRONMENT, environmentName);
 
-            // Native prefix matching also supports a more specific override below a framework category.
-            foreach (var (category, level) in options.MinimumLevelOverrides)
+            // Startup validation guarantees overrides; Serilog applies native category-prefix matching.
+            foreach (var (category, level) in options.MinimumLevelOverrides!)
             {
                 logger.MinimumLevel.Override(category, level);
             }
 
             // A null stderr threshold keeps every primary event, including Error/Fatal, on stdout.
-            logger.WriteTo.Console(new MaskedConsoleFormatter(options.ConsoleFormat == ObservabilityConstants.TEXT),
+            logger.WriteTo.Console(new MaskedConsoleFormatter(options.ConsoleFormat == ConsoleLogFormat.Text),
                 standardErrorFromLevel: null);
-            if (options.ConsoleFormat == ObservabilityConstants.BOTH)
+            if (options.ConsoleFormat == ConsoleLogFormat.Both)
             {
                 // This second sink is an optional human copy; shippers must ingest application stdout only.
                 logger.WriteTo.Console(new MaskedConsoleFormatter(useText: true), standardErrorFromLevel: LogEventLevel.Verbose);
@@ -121,6 +125,7 @@ public static class ObservabilityServiceRegistration
             builder.WithTracing(tracing =>
             {
                 tracing.AddSource(ObservabilityConstants.ACTIVITY_SOURCE);
+
                 // Inbound and outbound HTTP instrumentation are standard, not separate feature switches.
                 tracing.AddAspNetCoreInstrumentation(instrumentation =>
                 {

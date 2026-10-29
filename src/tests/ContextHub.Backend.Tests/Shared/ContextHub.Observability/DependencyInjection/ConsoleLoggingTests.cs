@@ -118,7 +118,7 @@ public sealed class ConsoleLoggingTests
     /// <param name="key">The invalid configuration key.</param>
     /// <param name="value">The unsupported setting.</param>
     [Theory]
-    [InlineData("ConsoleFormat", "Unknown")]
+    [InlineData("ConsoleFormat", "999")]
     [InlineData("MinimumLevel", "999")]
     [InlineData("MinimumLevelOverrides:Category", "999")]
     [InlineData("MinimumLevelOverrides: ", "Information")]
@@ -168,7 +168,7 @@ public sealed class ConsoleLoggingTests
     [Fact]
     public void Logging_WarningThreshold_DisablesDebug()
     {
-        var configuration = CreateConfiguration(ObservabilityConstants.TEXT, "Warning");
+        var configuration = CreateConfiguration("Text", "Warning");
         var services = new ServiceCollection();
         services.AddLoggingInfrastructure(configuration, "TestService", "Test");
         using var provider = services.BuildServiceProvider();
@@ -205,7 +205,7 @@ public sealed class ConsoleLoggingTests
             Assert.Contains("TestService", text, StringComparison.Ordinal);
             Assert.Contains(SharedConstants.LoggingVariables.MASKED_VALUE, text, StringComparison.Ordinal);
             Assert.DoesNotContain("private-key", text, StringComparison.Ordinal);
-            if (format == ObservabilityConstants.COMPACT_JSON)
+            if (format == "CompactJson")
             {
                 using var document = JsonDocument.Parse(text.Trim());
                 Assert.Equal(2, document.RootElement.GetProperty("Count").GetInt32());

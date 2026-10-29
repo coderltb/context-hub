@@ -6,10 +6,42 @@ namespace ContextHub.Shared.Constants;
 public static class SharedConstants
 {
     /// <summary>
+    /// Defines defaults for the shared email options contract.
+    /// </summary>
+    public static class EmailVariables
+    {
+        /// <summary>
+        /// Bounds send and response buffering together for native SDK requests.
+        /// </summary>
+        public const int REQUEST_TIMEOUT_SECONDS = 30;
+    }
+
+
+    /// <summary>
     /// Defines one masking vocabulary and budget for application diagnostics and console rendering.
     /// </summary>
     public static class LoggingVariables
     {
+        /// <summary>
+        /// Names the accepted cross-request correlation value in structured diagnostics.
+        /// </summary>
+        public const string CORRELATION_ID_PROPERTY = "CorrelationId";
+
+        /// <summary>
+        /// Names the host request identifier independently of the correlation header.
+        /// </summary>
+        public const string REQUEST_ID_PROPERTY = "RequestId";
+
+        /// <summary>
+        /// Names the W3C trace identifier in structured diagnostic properties.
+        /// </summary>
+        public const string TRACE_ID_PROPERTY = "TraceId";
+
+        /// <summary>
+        /// Names the W3C span identifier in structured diagnostic properties.
+        /// </summary>
+        public const string SPAN_ID_PROPERTY = "SpanId";
+
         /// <summary>
         /// Replaces sensitive values and payloads that cannot be safely inspected.
         /// </summary>
@@ -76,5 +108,54 @@ public static class SharedConstants
         /// Maximum number of items requested in one Admin list page.
         /// </summary>
         public const int MAX_PAGE_SIZE = 100;
+    }
+
+    /// <summary>
+    /// Bounds pure identifier generation independently of service uniqueness policy.
+    /// </summary>
+    public static class CodeVariables
+    {
+        /// <summary>
+        /// Maximum number of cryptographically generated decimal digits.
+        /// </summary>
+        public const int MAX_LENGTH = 32;
+
+        /// <summary>
+        /// Default separator between a caller-owned prefix and numeric suffix.
+        /// </summary>
+        public const string SEPARATOR = "_";
+    }
+
+    /// <summary>
+    /// Defines entropy size independently of any service-specific credential format.
+    /// </summary>
+    public static class TokenVariables
+    {
+        /// <summary>
+        /// Provides two hundred fifty-six bits of cryptographic randomness.
+        /// </summary>
+        public const int OPAQUE_TOKEN_BYTES = 32;
+    }
+
+    /// <summary>
+    /// Defines expiration arithmetic defaults independently of token generation and cache policy.
+    /// </summary>
+    public static class TimeVariables
+    {
+        /// <summary>
+        /// Moves refresh decisions one minute before the real expiration boundary.
+        /// </summary>
+        public const int EXPIRATION_PADDING_SECONDS = 60;
+    }
+
+    /// <summary>
+    /// Defines reusable database execution defaults, not service-owned SQL.
+    /// </summary>
+    public static class DatabaseVariables
+    {
+        /// <summary>
+        /// Limits a default command to thirty seconds.
+        /// </summary>
+        public const int COMMAND_TIMEOUT_SECONDS = 30;
     }
 }

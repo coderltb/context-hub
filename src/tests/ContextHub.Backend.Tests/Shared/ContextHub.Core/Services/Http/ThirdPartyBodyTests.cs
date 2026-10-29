@@ -3,7 +3,7 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Core.Services.Http;
 /// <summary>
 /// Verifies bounded body consumption after the transport has already returned successful response headers.
 /// </summary>
-[Collection(nameof(Mappings.GlobalMappingCollection))]
+[Collection(nameof(GlobalMappingCollection))]
 public sealed class ThirdPartyBodyTests
 {
     /// <summary>
@@ -47,9 +47,7 @@ public sealed class ThirdPartyBodyTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
         Assert.True(content.Disposed);
-        var entry = Assert.Single(logger.Entries, entry => entry.Message.Contains("body read cancelled", StringComparison.Ordinal));
-        Assert.Equal(LogLevel.Debug, entry.Level);
-        Assert.Null(entry.Exception);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Message.Contains("body read cancelled", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -67,9 +65,7 @@ public sealed class ThirdPartyBodyTests
         await Assert.ThrowsAsync<HttpRequestException>(() =>
             scope.ServiceProvider.GetRequiredService<IThirdPartyApiService>().HandleApiData(Request()));
 
-        var entry = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Warning);
-        Assert.Contains("body read failed", entry.Message);
-        Assert.Null(entry.Exception);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
     }
 
     /// <summary>
@@ -94,11 +90,11 @@ public sealed class ThirdPartyBodyTests
     }
 
     /// <summary>
-    /// Records a known body transport failure without replacing its exception or logging provider-controlled text.
+    /// Leaves body transport diagnostics to the caller while preserving native failure and response disposal.
     /// </summary>
     /// <returns>The safe body diagnostic and native exception-identity assertions.</returns>
     [Fact]
-    public async Task TransportReadFailure_EmitsOneSafeBodyDiagnostic()
+    public async Task TransportReadFailure_PreservesExceptionWithoutDuplicateDiagnostic()
     {
         var failure = new HttpRequestException("private-provider-message");
         var logger = new TestLogger<ThirdPartyApiService>();
@@ -111,10 +107,8 @@ public sealed class ThirdPartyBodyTests
 
         Assert.Same(failure, actual);
         Assert.True(content.Disposed);
-        var entry = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Warning);
-        Assert.Contains(nameof(HttpRequestException), entry.Message);
-        Assert.DoesNotContain("private-provider-message", entry.Message);
-        Assert.Null(entry.Exception);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level >= LogLevel.Warning);
+        Assert.All(logger.Entries, entry => Assert.DoesNotContain("private-provider-message", entry.Message));
     }
 
     /// <summary>

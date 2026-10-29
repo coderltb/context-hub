@@ -429,6 +429,8 @@ appsettings.*.json
 
 # Keep base config
 !appsettings.json
+# Track only the blank Authentication deployment template.
+!src/services/Authentication/ContextHub.Authentication.Api/appsettings.Production.json
 
 # Target workspace local AI/agent additions
 AGENTS.md

@@ -18,7 +18,11 @@ public sealed class ActivityEnricher : ILogEventEnricher
             return;
         }
 
-        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(ObservabilityConstants.TRACE_ID, activity.TraceId.ToString()));
-        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(ObservabilityConstants.SPAN_ID, activity.SpanId.ToString()));
+        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(
+            SharedConstants.LoggingVariables.TRACE_ID_PROPERTY,
+            activity.TraceId.ToString()));
+        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(
+            SharedConstants.LoggingVariables.SPAN_ID_PROPERTY,
+            activity.SpanId.ToString()));
     }
 }
