@@ -26,8 +26,9 @@ public static class AuthenticationApplicationExtensions
         }
 
         // Match native Razor trailing-slash variants while keeping protocol and Admin failures outside the HTML branch.
-        app.UseWhen(context => SsoPageConstants.ROUTES.Values.Contains(
-            context.Request.Path.Value?.TrimEnd('/') ?? string.Empty, StringComparer.OrdinalIgnoreCase), branch =>
+        app.UseWhen(
+            context => SsoPageConstants.ROUTES.Values.Contains(context.Request.Path.Value?.TrimEnd('/') ?? string.Empty, StringComparer.OrdinalIgnoreCase),
+            branch =>
             branch.UseExceptionHandler(AuthenticationConstants.Endpoints.ERROR_PAGE));
         app.UseHttpsRedirection();
 
@@ -42,7 +43,7 @@ public static class AuthenticationApplicationExtensions
         if (app.Environment.IsDevelopment())
         {
             app.MapOpenApi().AllowAnonymous();
-            app.UseApiSwaggerUI(options =>
+            app.UseApiSwaggerUi(options =>
             {
                 options.RoutePrefix = ApiValueConstants.SWAGGER_ROUTE;
                 options.SwaggerEndpoint(ApiValueConstants.OPENAPI_PATH, ApiValueConstants.DOCUMENT_TITLE);
@@ -53,20 +54,26 @@ public static class AuthenticationApplicationExtensions
         }
 
         // The self-check never opens the database and retains the shared native health response.
-        app.MapHealthChecks(ApiRouteConstants.LIVENESS, new HealthCheckOptions
+        app.MapHealthChecks(
+            ApiRouteConstants.LIVENESS,
+            new HealthCheckOptions
         {
             Predicate = registration => registration.Tags.Contains(HealthConstants.LIVENESS_TAG),
             ResponseWriter = HealthResponseWriter.WriteLivenessAsync
         }).AllowAnonymous();
 
         // Database readiness and recovery coordination have independent probe sets and the same safe shared writer.
-        app.MapHealthChecks(ApiRouteConstants.READINESS, new HealthCheckOptions
+        app.MapHealthChecks(
+            ApiRouteConstants.READINESS,
+            new HealthCheckOptions
         {
             Predicate = registration => registration.Tags.Contains(AuthenticationInfrastructureConstants.READINESS_HEALTH_TAG),
             ResponseWriter = HealthResponseWriter.WriteReadinessAsync
         }).AllowAnonymous();
 
-        app.MapHealthChecks(ApiRouteConstants.RECOVERY_HEALTH, new HealthCheckOptions
+        app.MapHealthChecks(
+            ApiRouteConstants.RECOVERY_HEALTH,
+            new HealthCheckOptions
         {
             Predicate = registration => registration.Tags.Contains(AuthenticationInfrastructureConstants.RECOVERY_HEALTH_TAG),
             ResponseWriter = HealthResponseWriter.WriteReadinessAsync

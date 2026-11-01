@@ -18,10 +18,7 @@ public sealed class RegenerateInvitationCommandHandler(IUserService userService)
         CancellationToken cancellationToken)
     {
         // Return only the replacement invitation contract; neither version material nor the one-time link belongs in diagnostics.
-        var result = await userService.RegenerateInvitationAsync(
-            request.UserId,
-            request.Request,
-            cancellationToken);
+        var result = await userService.RegenerateInvitationAsync(request.UserId, request.Request, cancellationToken);
 
         return new(result.Adapt<InvitationResponseDto>());
     }

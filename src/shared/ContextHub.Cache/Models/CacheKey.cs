@@ -10,7 +10,9 @@ public sealed record CacheKey
     /// </summary>
     /// <param name="cacheNamespace">The validated capability namespace.</param>
     /// <param name="value">The opaque storage key.</param>
-    private CacheKey(string cacheNamespace, string value)
+    private CacheKey(
+        string cacheNamespace,
+        string value)
     {
         Namespace = cacheNamespace;
         Value = value;

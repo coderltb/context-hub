@@ -43,7 +43,9 @@ public static class StringExtension
     /// <param name="source">The optional original text.</param>
     /// <param name="charsToRemove">The characters to remove; null or empty means no change.</param>
     /// <returns>The filtered text, or the original value when no removal is requested.</returns>
-    public static string? RemoveCharacters(this string? source, params char[]? charsToRemove)
+    public static string? RemoveCharacters(
+        this string? source,
+        params char[]? charsToRemove)
     {
         if (string.IsNullOrEmpty(source) || charsToRemove is not { Length: > 0 })
         {
@@ -76,7 +78,9 @@ public static class StringExtension
     /// <param name="source">The original text.</param>
     /// <param name="maximum">The nonnegative number of text elements to retain.</param>
     /// <returns>The complete prefix, or the original string when within the limit.</returns>
-    public static string? Truncate(this string? source, int maximum)
+    public static string? Truncate(
+        this string? source,
+        int maximum)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(maximum);
 
@@ -179,7 +183,9 @@ public static class StringExtension
     /// <param name="source">The optional original text; null and empty values are preserved.</param>
     /// <param name="value">The optional prefix; null or empty means no removal.</param>
     /// <returns>The text after removing matching prefixes, or the original value when no removal applies.</returns>
-    public static string? RemoveStartWith(this string? source, string? value)
+    public static string? RemoveStartWith(
+        this string? source,
+        string? value)
     {
         // Missing text or pattern means no work; skip empty patterns so the loop always advances.
         if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(value))
@@ -203,7 +209,9 @@ public static class StringExtension
     /// <param name="source">The optional original text; null and empty values are preserved.</param>
     /// <param name="value">The optional suffix; null or empty means no removal.</param>
     /// <returns>The text after removing matching suffixes, or the original value when no removal applies.</returns>
-    public static string? RemoveEndWith(this string? source, string? value)
+    public static string? RemoveEndWith(
+        this string? source,
+        string? value)
     {
         // An absent removal request is a no-op; an empty suffix must never enter the removal loop.
         if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(value))

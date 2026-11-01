@@ -1,7 +1,6 @@
 // Global using directives
 
 
-
 global using System.Data.Common;
 global using System.Data;
 
@@ -37,7 +36,6 @@ global using SendGrid;
 global using ContextHub.Core.Behaviors;
 global using ContextHub.Core.Constants;
 
-
 global using ContextHub.Core.Factories.Persistence;
 global using ContextHub.Core.Interceptors.Auditing;
 global using ContextHub.Core.Interfaces.Auditing;
@@ -67,7 +65,6 @@ global using ContextHub.Shared.Models.Validation;
 
 global using CoreAuthorizationException = ContextHub.Core.Exceptions.AuthorizationException;
 global using CoreValidationException = ContextHub.Core.Exceptions.ValidationException;
-
 
 global using Microsoft.Extensions.Http.Resilience;
 global using Polly.CircuitBreaker;

@@ -24,12 +24,14 @@ public sealed class OwnerRegistrationService(
         CancellationToken cancellationToken)
     {
         // Provision required native records before the account workflow takes its membership lock.
-        var created = await unitOfWork.ExecuteInTransactionAsync(async token =>
+        var created = await unitOfWork.ExecuteInTransactionAsync(
+            async token =>
         {
             await identityProvisioningService.ProvisionAsync(token);
 
             return await userService.CreateAsync(request, token);
-        }, cancellationToken);
+        },
+            cancellationToken);
 
         // Display metadata is invalidated only after the native records commit.
         await roleService.InvalidateCacheAsync(cancellationToken);

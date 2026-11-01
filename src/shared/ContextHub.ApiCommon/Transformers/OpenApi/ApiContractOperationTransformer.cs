@@ -86,14 +86,20 @@ public sealed class ApiContractOperationTransformer(ILogger<ApiContractOperation
                 [ApiCommonConstants.JSON_CONTENT_TYPE] = new()
                 {
                     Schema = schema,
-                    Example = JsonSerializer.SerializeToNode(ApiErrorExampleFactory.Create(status, context.ApplicationServices.GetRequiredService<ApiResponseBoundary>().ApiVersion), OpenApiOperationMetadataHelper.SerializerOptions(context))
+                    Example = JsonSerializer.SerializeToNode(
+                        ApiErrorExampleFactory.Create(status, context.ApplicationServices.GetRequiredService<ApiResponseBoundary>().ApiVersion),
+                        OpenApiOperationMetadataHelper.SerializerOptions(context))
                 }
             };
             operation.Responses[key] = response;
         }
 
-        logger.LogDebug(ApiCommonLogConstants.OpenApiLogs.MAPPINGS_APPLIED,
-            registry.Requests.Count, registry.Responses.Count, registry.Operations.Count, errors.Count);
+        logger.LogDebug(
+            ApiCommonLogConstants.OpenApiLogs.MAPPINGS_APPLIED,
+            registry.Requests.Count,
+            registry.Responses.Count,
+            registry.Operations.Count,
+            errors.Count);
     }
 
     /// <summary>
@@ -102,7 +108,9 @@ public sealed class ApiContractOperationTransformer(ILogger<ApiContractOperation
     /// <param name="context">The endpoint and host policy services.</param>
     /// <param name="statuses">The operation's accumulated failure statuses.</param>
     /// <returns>A task that completes after applicable boundary response metadata is added.</returns>
-    private static async Task AddBoundaryStatuses(OpenApiOperationTransformerContext context, HashSet<int> statuses)
+    private static async Task AddBoundaryStatuses(
+        OpenApiOperationTransformerContext context,
+        HashSet<int> statuses)
     {
         var metadata = context.Description.ActionDescriptor.EndpointMetadata;
         // Model binding can reject body, route, query and header values before user code executes.
@@ -117,8 +125,7 @@ public sealed class ApiContractOperationTransformer(ILogger<ApiContractOperation
             context.ApplicationServices.GetService<IAuthorizationPolicyProvider>() is { } provider)
         {
             // CombineAsync includes default/named policies and fallback policy, matching native authorization behavior.
-            var policy = await AuthorizationPolicy.CombineAsync(provider, metadata.OfType<IAuthorizeData>(),
-                metadata.OfType<AuthorizationPolicy>());
+            var policy = await AuthorizationPolicy.CombineAsync(provider, metadata.OfType<IAuthorizeData>(), metadata.OfType<AuthorizationPolicy>());
             if (policy is not null)
             {
                 statuses.Add(StatusCodes.Status401Unauthorized);

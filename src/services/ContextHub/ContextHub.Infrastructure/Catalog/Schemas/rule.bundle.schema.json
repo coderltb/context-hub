@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "when_to_use", "when_not_to_use", "inputs", "outputs", "instructions", "completion_criteria", "applies_to", "requirements", "violation_handling"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "when_to_use": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "when_not_to_use": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "inputs": {"$ref": "bundle-common.schema.json#/$defs/inputs"},
+    "outputs": {"$ref": "bundle-common.schema.json#/$defs/outputs"},
+    "instructions": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "completion_criteria": {"$ref": "bundle-common.schema.json#/$defs/textList"},
+    "applies_to": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "requirements": {"$ref": "bundle-common.schema.json#/$defs/textList"},
+    "violation_handling": {"$ref": "bundle-common.schema.json#/$defs/text"}
+  }
+}

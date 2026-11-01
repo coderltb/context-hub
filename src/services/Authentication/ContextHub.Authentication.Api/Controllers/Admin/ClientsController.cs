@@ -30,7 +30,9 @@ public sealed class ClientsController(IMediator mediator) : BaseApiController(me
     [HttpGet(ApiRouteConstants.CLIENT_ID)]
     [ProducesResponseType<ApiResponse<ClientDetailResponseDto>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Get(Guid clientId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Get(
+        Guid clientId,
+        CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(new GetClientQuery(clientId), cancellationToken);
 
@@ -52,7 +54,9 @@ public sealed class ClientsController(IMediator mediator) : BaseApiController(me
         NoStore = true,
         Location = ResponseCacheLocation.None,
         Order = ApiValueConstants.SENSITIVE_RESPONSE_CACHE_ORDER)]
-    public async Task<IActionResult> Create(CreateClientRequestDto request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(
+        CreateClientRequestDto request,
+        CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(new CreateClientCommand(request), cancellationToken);
 

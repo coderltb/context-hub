@@ -3,12 +3,12 @@ namespace ContextHub.ApiCommon.Filters.Logging;
 /// <summary>
 /// Records model-bound DTO diagnostics without taking ownership of HTTP bodies, result execution or business failures.
 /// </summary>
-/// <param name="boundary">The host-selected API scope shared with response adapters.</param>
-/// <param name="serializer">The existing DI-managed JSON contract.</param>
+/// <param name="apiResponseBoundary">The host-selected API scope shared with response adapters.</param>
+/// <param name="jsonSerializerService">The existing DI-managed JSON contract.</param>
 /// <param name="logger">The logger receiving only masked strings and safe metadata.</param>
 public sealed class ApiLoggingFilter(
-    ApiResponseBoundary boundary,
-    IJsonSerializerService serializer,
+    ApiResponseBoundary apiResponseBoundary,
+    IJsonSerializerService jsonSerializerService,
     ILogger<ApiLoggingFilter> logger) : IAsyncActionFilter, IAsyncAlwaysRunResultFilter, IOrderedFilter
 {
     /// <summary>
@@ -22,9 +22,11 @@ public sealed class ApiLoggingFilter(
     /// <param name="context">The bound MVC action context.</param>
     /// <param name="next">The native action continuation, deliberately outside diagnostic exception handling.</param>
     /// <returns>The unchanged action execution.</returns>
-    public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    public async Task OnActionExecutionAsync(
+        ActionExecutingContext context,
+        ActionExecutionDelegate next)
     {
-        if (boundary.Contains(context.HttpContext.Request.Path))
+        if (apiResponseBoundary.Contains(context.HttpContext.Request.Path))
         {
             var arguments = context.ActionArguments
                 .Where(argument =>
@@ -38,11 +40,13 @@ public sealed class ApiLoggingFilter(
                             ClaimsPrincipal or ClaimsIdentity or Claim or IServiceProvider or ActionContext);
                 })
                 .ToDictionary(argument => argument.Key, argument => argument.Value, StringComparer.Ordinal);
-            var multipart = context.HttpContext.Request.ContentType?.StartsWith(
-                ApiCommonConstants.MULTIPART_MEDIA_PREFIX,
-                StringComparison.OrdinalIgnoreCase) == true;
+            var multipart = context.HttpContext.Request.ContentType?.StartsWith(ApiCommonConstants.MULTIPART_MEDIA_PREFIX, StringComparison.OrdinalIgnoreCase) == true;
             (string? Value, string? Reason) payload;
-            if (multipart)
+            if (context.ActionDescriptor.EndpointMetadata.OfType<ApiMetadataOnlyLoggingAttribute>().Any())
+            {
+                payload = (null, ApiCommonConstants.Logging.METADATA_ONLY);
+            }
+            else if (multipart)
             {
                 payload = (null, ApiCommonConstants.Logging.MULTIPART);
             }
@@ -58,7 +62,10 @@ public sealed class ApiLoggingFilter(
             // Only the redacted copy crosses ILogger; no DTO reference or unmasked snapshot is retained in the request.
             logger.LogInformation(
                 ApiCommonLogConstants.PayloadLogs.REQUEST_RECEIVED,
-                ActionName(context.ActionDescriptor), payload.Value, payload.Reason, context.HttpContext.Request.ContentLength);
+                ActionName(context.ActionDescriptor),
+                payload.Value,
+                payload.Reason,
+                context.HttpContext.Request.ContentLength);
         }
 
         await next();
@@ -70,18 +77,23 @@ public sealed class ApiLoggingFilter(
     /// <param name="context">The MVC result context.</param>
     /// <param name="next">The native result continuation.</param>
     /// <returns>The unchanged result execution.</returns>
-    public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
+    public async Task OnResultExecutionAsync(
+        ResultExecutingContext context,
+        ResultExecutionDelegate next)
     {
         var executed = await next();
-        if (!boundary.Contains(context.HttpContext.Request.Path) || executed.Canceled ||
+        if (!apiResponseBoundary.Contains(context.HttpContext.Request.Path) || executed.Canceled ||
             executed.Exception is not null && !executed.ExceptionHandled)
         {
             return;
         }
 
         // Files, streams and deferred enumerations remain native results; logging must not consume them a second time.
-        (string? Value, string? Reason) payload = (null, ApiCommonConstants.Logging.UNSUPPORTED);
-        if (executed.Result is ObjectResult result &&
+        var metadataOnly = context.ActionDescriptor.EndpointMetadata.OfType<ApiMetadataOnlyLoggingAttribute>().Any();
+        (string? Value, string? Reason) payload = (null, metadataOnly
+            ? ApiCommonConstants.Logging.METADATA_ONLY : ApiCommonConstants.Logging.UNSUPPORTED);
+        if (!metadataOnly &&
+            executed.Result is ObjectResult result &&
             (result.Value is null or ApiResponse<object> { Data: null } || IsSupportedType(result.Value.GetType(), [])))
         {
             payload = SerializePayload(result.Value);
@@ -89,7 +101,10 @@ public sealed class ApiLoggingFilter(
 
         logger.LogInformation(
             ApiCommonLogConstants.PayloadLogs.RESPONSE_PRODUCED,
-            ActionName(context.ActionDescriptor), context.HttpContext.Response.StatusCode, payload.Value, payload.Reason);
+            ActionName(context.ActionDescriptor),
+            context.HttpContext.Response.StatusCode,
+            payload.Value,
+            payload.Reason);
     }
 
     /// <summary>
@@ -101,7 +116,7 @@ public sealed class ApiLoggingFilter(
     {
         try
         {
-            var json = serializer.Serialize(value);
+            var json = jsonSerializerService.Serialize(value);
             var masked = LogMaskingHelper.MaskAllSensitiveData(json);
 
             // Decide the size limit after redaction, retaining neither a raw fragment nor malformed truncated JSON.
@@ -124,7 +139,9 @@ public sealed class ApiLoggingFilter(
     /// <param name="type">The runtime value type or declared nested property type.</param>
     /// <param name="visited">Types already examined in this graph, preventing recursive DTO definitions from looping.</param>
     /// <returns>True for scalar values, materialized typed collections and readable DTO properties.</returns>
-    private static bool IsSupportedType(Type type, HashSet<Type> visited)
+    private static bool IsSupportedType(
+        Type type,
+        HashSet<Type> visited)
     {
         type = Nullable.GetUnderlyingType(type) ?? type;
         if (IsExcludedType(type))
@@ -219,3 +236,4 @@ public sealed class ApiLoggingFilter(
         ? controller.ControllerName + "." + controller.ActionName
         : descriptor.Id;
 }
+

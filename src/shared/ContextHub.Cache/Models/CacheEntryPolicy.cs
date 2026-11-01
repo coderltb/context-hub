@@ -12,7 +12,10 @@ public sealed record CacheEntryPolicy
     /// <param name="localExpiration">The maximum local-cache lifetime.</param>
     /// <param name="tags">Optional trusted capability-owned invalidation groups.</param>
     /// <param name="flags">Optional native read/write bypass flags; null keeps the host defaults.</param>
-    public CacheEntryPolicy(TimeSpan expiration, TimeSpan localExpiration, IEnumerable<string>? tags = null,
+    public CacheEntryPolicy(
+        TimeSpan expiration,
+        TimeSpan localExpiration,
+        IEnumerable<string>? tags = null,
         HybridCacheEntryFlags? flags = null)
     {
         // L1 must not outlive L2; otherwise one host could serve older data after the shared entry expires.

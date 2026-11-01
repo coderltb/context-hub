@@ -46,8 +46,7 @@ public static class HttpClientServiceRegistration
         services.AddHttpCorrelation();
         services.AddRestClients();
 
-        // Native factory logs include request URIs. Transport metadata logs replace them without exposing paths or credentials.
-        // Pooled cookie containers must not share identity between requests made on behalf of different consumers.
+        // Replace URI logs with safe metadata and disable pooled cookies to isolate consumer identity.
         return services.AddHttpClient(name, configure)
             .RemoveAllLoggers()
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { UseCookies = false })

@@ -11,7 +11,10 @@ public class ApiException : Exception
     /// <param name="statusCode">The HTTP failure supported by the API error adapter.</param>
     /// <param name="errorCode">Optional internal diagnostic context; blank uses the standard code.</param>
     /// <param name="publicMessage">Optional declared description; the global handler never publishes this override.</param>
-    public ApiException(int statusCode, string? errorCode = null, string? publicMessage = null)
+    public ApiException(
+        int statusCode,
+        string? errorCode = null,
+        string? publicMessage = null)
         : base(publicMessage)
     {
         // The existing mapper rejects unsupported statuses once, before any response can be written.

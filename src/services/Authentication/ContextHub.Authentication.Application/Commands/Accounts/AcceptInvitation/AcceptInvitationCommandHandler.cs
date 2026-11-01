@@ -12,7 +12,9 @@ public sealed class AcceptInvitationCommandHandler(IAccountService accountServic
     /// <param name="request">The submitted SSO proof.</param>
     /// <param name="cancellationToken">Cancels the invitation account query and persistence.</param>
     /// <returns>Whether the account operation succeeded.</returns>
-    public async ValueTask<bool> Handle(AcceptInvitationCommand request, CancellationToken cancellationToken)
+    public async ValueTask<bool> Handle(
+        AcceptInvitationCommand request,
+        CancellationToken cancellationToken)
     {
         // Passwords and invitation proofs remain inside the native account service.
         return await accountService.AcceptInvitationAsync(request.Request, cancellationToken);

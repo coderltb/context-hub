@@ -10,7 +10,9 @@ public sealed class ActivityEnricher : ILogEventEnricher
     /// </summary>
     /// <param name="logEvent">The operational event.</param>
     /// <param name="propertyFactory">The Serilog property factory.</param>
-    public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
+    public void Enrich(
+        LogEvent logEvent,
+        ILogEventPropertyFactory propertyFactory)
     {
         var activity = Activity.Current;
         if (activity?.IdFormat != ActivityIdFormat.W3C)
@@ -18,11 +20,7 @@ public sealed class ActivityEnricher : ILogEventEnricher
             return;
         }
 
-        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(
-            SharedConstants.LoggingVariables.TRACE_ID_PROPERTY,
-            activity.TraceId.ToString()));
-        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(
-            SharedConstants.LoggingVariables.SPAN_ID_PROPERTY,
-            activity.SpanId.ToString()));
+        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(SharedConstants.LoggingVariables.TRACE_ID_PROPERTY, activity.TraceId.ToString()));
+        logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(SharedConstants.LoggingVariables.SPAN_ID_PROPERTY, activity.SpanId.ToString()));
     }
 }

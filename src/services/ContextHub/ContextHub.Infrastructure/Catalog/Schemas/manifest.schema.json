@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://context-hub.example.invalid/schemas/v1/manifest.schema.json",
+  "title": "Context Hub internal immutable package manifest V1 (Owner only)",
+  "description": "Stored/Admin authority. Never serialize this object directly to MCP; use public-manifest.schema.json projection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "package_id", "package_type", "version", "status", "content_hash", "tags", "capabilities", "required_capabilities", "dependencies", "conflicts_with", "authoring_source", "upstream_references", "published_at"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "package_id": {"$ref": "bundle-common.schema.json#/$defs/packageId"},
+    "package_type": {"enum": ["agent", "skill", "rule", "workflow"]},
+    "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$", "maxLength": 64},
+    "status": {"const": "published"},
+    "content_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "tags": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "maxLength": 64, "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"}},
+    "capabilities": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"$ref": "bundle-common.schema.json#/$defs/packageCapability"}},
+    "required_capabilities": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"$ref": "bundle-common.schema.json#/$defs/clientCapability"}},
+    "dependencies": {"type": "array", "maxItems": 32, "items": {"type": "object", "additionalProperties": false, "required": ["package_id", "version"], "properties": {"package_id": {"$ref": "bundle-common.schema.json#/$defs/packageId"}, "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"}}}},
+    "conflicts_with": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"$ref": "bundle-common.schema.json#/$defs/packageId"}},
+    "authoring_source": {"type": "object", "additionalProperties": false, "required": ["repository", "commit"], "properties": {"repository": {"type": "string", "minLength": 1, "maxLength": 160}, "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"}}},
+    "upstream_references": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/upstreamReference"}},
+    "published_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "upstreamReference": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "commit", "source_paths", "use_mode", "license", "attribution", "adaptation_notes"],
+      "properties": {
+        "repository": {"type": "string", "format": "uri", "maxLength": 512},
+        "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "source_paths": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"}},
+        "use_mode": {"enum": ["reference", "adapted"]},
+        "license": {"type": "string", "minLength": 1, "maxLength": 128},
+        "attribution": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "adaptation_notes": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "adaptation_revision": {"type": "string", "maxLength": 128}
+      }
+    }
+  }
+}

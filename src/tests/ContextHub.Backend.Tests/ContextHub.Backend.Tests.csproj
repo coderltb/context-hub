@@ -45,4 +45,7 @@
       <ProjectReference Include="..\..\shared\ContextHub.Shared\ContextHub.Shared.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="Services/ContextHub/Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
 </Project>

@@ -83,3 +83,4 @@ global using NewtonsoftJsonIgnoreAttribute = Newtonsoft.Json.JsonIgnoreAttribute
 
 global using Swashbuckle.AspNetCore.SwaggerUI;
 global using System.IO;
+global using ContextHub.ApiCommon.Attributes.Logging;

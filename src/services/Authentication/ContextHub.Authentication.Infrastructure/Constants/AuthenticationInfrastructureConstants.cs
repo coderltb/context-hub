@@ -170,6 +170,7 @@ public static class AuthenticationInfrastructureConstants
     /// Rechecks the current account after native introspection claims are attached.
     /// </summary>
     public const int INTROSPECTION_HANDLER_ORDER_OFFSET = 500;
+
     /// <summary>
     /// Names the Development-only public documentation client in native stores.
     /// </summary>

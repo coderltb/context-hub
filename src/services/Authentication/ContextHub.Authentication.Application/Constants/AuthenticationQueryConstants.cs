@@ -33,12 +33,12 @@ public static class AuthenticationQueryConstants
     /// <summary>
     /// Identifies ascending ordering.
     /// </summary>
-    public const string ASCENDING = "asc";
+    public const string ASCENDING = SharedConstants.SortVariables.ASCENDING;
 
     /// <summary>
     /// Identifies descending ordering.
     /// </summary>
-    public const string DESCENDING = "desc";
+    public const string DESCENDING = SharedConstants.SortVariables.DESCENDING;
 
     /// <summary>
     /// Preserves the default account ordering in the public request DTO.

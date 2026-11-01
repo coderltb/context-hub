@@ -22,10 +22,11 @@ public sealed class ApiErrorResponseFilter(
     /// <param name="context">The current MVC result context.</param>
     /// <param name="next">The next result filter.</param>
     /// <returns>The asynchronous execution of the resulting response.</returns>
-    public async Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
+    public async Task OnResultExecutionAsync(
+        ResultExecutingContext context,
+        ResultExecutionDelegate next)
     {
-        // Always-run filters also see short-circuited MVC results, such as unsupported input media types.
-        // Only native status results are adapted; files, streams and application-defined bodies remain intact.
+        // Adapt short-circuited native status results while preserving files, streams and custom bodies.
         if (!context.HttpContext.Response.HasStarted && boundary.Contains(context.HttpContext.Request.Path) &&
             context.Result is StatusCodeResult { StatusCode: var status } && status.IsSupportedApiError())
         {

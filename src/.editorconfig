@@ -32,3 +32,8 @@ dotnet_naming_symbols.protected_fields.applicable_kinds = field
 dotnet_naming_symbols.protected_fields.applicable_accessibilities = protected, protected_internal, private_protected
 dotnet_naming_style.underscore_camel.capitalization = camel_case
 dotnet_naming_style.underscore_camel.required_prefix = _
+
+# Align JetBrains predefined groups with the existing UPPER_SNAKE_CASE convention.
+resharper_csharp_naming_rule.constants = AA_BB
+resharper_csharp_naming_rule.private_constants = AA_BB
+resharper_csharp_naming_rule.static_readonly = AA_BB

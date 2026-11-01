@@ -18,6 +18,7 @@ public sealed class IssueClientTokenCommandValidator : AbstractValidator<IssueCl
             .NotEmpty()
             .MaximumLength(AuthenticationConstants.MAX_TOOL_NAME_LENGTH)
             .Matches(AuthenticationConstants.TOOL_NAME_PATTERN);
+
         // Null is unlimited; an explicit expiry must still be usable when issuance begins.
         RuleFor(command => command.Request.ExpiresAt)
             .Must(expiry => expiry is null || expiry > DateTimeOffset.UtcNow)

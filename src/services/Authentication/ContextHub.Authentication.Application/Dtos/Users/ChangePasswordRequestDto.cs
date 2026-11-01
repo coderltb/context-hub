@@ -5,7 +5,9 @@ namespace ContextHub.Authentication.Application.Dtos.Users;
 /// </summary>
 /// <param name="currentPassword">The signed-in account's current password.</param>
 /// <param name="newPassword">The replacement password validated by native Identity policy.</param>
-public sealed class ChangePasswordRequestDto(string currentPassword, string newPassword)
+public sealed class ChangePasswordRequestDto(
+    string currentPassword,
+    string newPassword)
 {
     /// <summary>
     /// Gets the current credential proof, which must be masked before diagnostics.

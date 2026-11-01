@@ -13,7 +13,10 @@ public sealed class ApiValueExamplesOperationTransformer(ILogger<ApiValueExample
     /// <param name="context">The real binding metadata and scoped provider services.</param>
     /// <param name="cancellationToken">Cancellation for document generation.</param>
     /// <returns>The synchronous enrichment completion.</returns>
-    public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken cancellationToken)
+    public Task TransformAsync(
+        OpenApiOperation operation,
+        OpenApiOperationTransformerContext context,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!OpenApiOperationMetadataHelper.IsApi(context))
@@ -121,8 +124,13 @@ public sealed class ApiValueExamplesOperationTransformer(ILogger<ApiValueExample
     /// <param name="services">The document's provider scope.</param>
     /// <param name="options">The native endpoint JSON options.</param>
     /// <returns>The synthetic field value, or null when no mapped serialized property exists.</returns>
-    private static JsonNode? ReadValue(ApiParameterDescription parameter, OpenApiValueTarget target, OpenApiRegistry? registry,
-        Dictionary<Type, JsonObject> fixtures, IServiceProvider services, JsonSerializerOptions options)
+    private static JsonNode? ReadValue(
+        ApiParameterDescription parameter,
+        OpenApiValueTarget target,
+        OpenApiRegistry? registry,
+        Dictionary<Type, JsonObject> fixtures,
+        IServiceProvider services,
+        JsonSerializerOptions options)
     {
         var container = parameter.ModelMetadata.ContainerType;
         var propertyName = parameter.ModelMetadata.PropertyName;
@@ -153,7 +161,10 @@ public sealed class ApiValueExamplesOperationTransformer(ILogger<ApiValueExample
     /// <param name="name">The exact field binding name.</param>
     /// <param name="example">The detached synthetic field value.</param>
     /// <returns>An operation-local schema when a field matches, otherwise null.</returns>
-    private static OpenApiSchema? WithFormValue(IOpenApiSchema? schema, string name, JsonNode example)
+    private static OpenApiSchema? WithFormValue(
+        IOpenApiSchema? schema,
+        string name,
+        JsonNode example)
     {
         var source = schema is OpenApiSchemaReference reference ? reference.Target : schema;
         if (source?.Properties?.TryGetValue(name, out var property) == true)

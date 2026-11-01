@@ -40,8 +40,10 @@ public sealed class ClientService : IClientService
         // Native HMAC accepts an empty key; this required service key must not become publicly reproducible material.
         if (_clientTokenPepper.Length < AuthenticationInfrastructureConstants.MIN_CLIENT_TOKEN_KEY_BYTES)
         {
-            logger.LogError(AuthenticationLogConstants.OPERATION_REJECTED,
-                nameof(ClientService), AuthenticationErrorConstants.INVALID_CLIENT_TOKEN_KEY);
+            logger.LogError(
+                AuthenticationLogConstants.OPERATION_REJECTED,
+                nameof(ClientService),
+                AuthenticationErrorConstants.INVALID_CLIENT_TOKEN_KEY);
             throw new CryptographicException(AuthenticationErrorConstants.INVALID_CLIENT_TOKEN_KEY);
         }
     }
@@ -94,7 +96,9 @@ public sealed class ClientService : IClientService
     /// <param name="token">The untrusted bearer value, never logged or accepted from another scheme.</param>
     /// <param name="cancellationToken">Cancels the current-state query.</param>
     /// <returns>The verified current credential state, or null without account-specific diagnostics.</returns>
-    public async Task<ClientTokenModel?> ValidateTokenAsync(string? token, CancellationToken cancellationToken)
+    public async Task<ClientTokenModel?> ValidateTokenAsync(
+        string? token,
+        CancellationToken cancellationToken)
     {
         // Reject malformed credentials before database I/O; the embedded identifier is only a lookup hint.
         if (!ClientTokenHelper.TryGetId(token, out var tokenId))
@@ -171,7 +175,10 @@ public sealed class ClientService : IClientService
         token.RevokedAt is not null
             ? Task.FromResult(token.Adapt<ClientTokenResponseDto>())
             : _clientRepository.UpdateTokenAsync(
-                token with { RevokedAt = DateTimeOffset.UtcNow, RevokedBy = _auditActorAccessor.ActorId },
+                token with {
+                    RevokedAt = DateTimeOffset.UtcNow,
+                    RevokedBy = _auditActorAccessor.ActorId
+                },
                 cancellationToken);
 
     /// <summary>
@@ -180,7 +187,9 @@ public sealed class ClientService : IClientService
     /// <param name="clientId">The receiving application.</param>
     /// <param name="request">The grant set and optional expiry, copied before persistence.</param>
     /// <returns>The transient generated material, never persisted or logged as a whole.</returns>
-    private ClientTokenIssuanceModel CreateCredential(Guid clientId, IssueClientTokenRequestDto request)
+    private ClientTokenIssuanceModel CreateCredential(
+        Guid clientId,
+        IssueClientTokenRequestDto request)
     {
         // Create a public metadata identifier and fresh random secret; only the keyed digest is persisted.
         var id = Guid.CreateVersion7();

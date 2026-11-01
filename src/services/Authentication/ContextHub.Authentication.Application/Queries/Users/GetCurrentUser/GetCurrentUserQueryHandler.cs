@@ -5,7 +5,9 @@ namespace ContextHub.Authentication.Application.Queries.Users.GetCurrentUser;
 /// </summary>
 /// <param name="userService">The application account port returning approved projections.</param>
 /// <param name="authService">The shared accessor for the authenticated human account.</param>
-public sealed class GetCurrentUserQueryHandler(IUserService userService, IAuthService authService)
+public sealed class GetCurrentUserQueryHandler(
+    IUserService userService,
+    IAuthService authService)
     : IRequestHandler<GetCurrentUserQuery, ApiResponse<UserResponseDto>>
 {
     /// <summary>
@@ -20,8 +22,10 @@ public sealed class GetCurrentUserQueryHandler(IUserService userService, IAuthSe
     {
         // Admin authorization requires a human subject before this handler can run.
         var result = await userService.GetAsync(authService.UserId!.Value, cancellationToken)
-            ?? throw new BusinessException(AuthenticationErrorConstants.USER_MISSING,
-                AuthenticationErrorConstants.ACCOUNT_UNAVAILABLE, BusinessErrorKind.NotFound);
+            ?? throw new BusinessException(
+                AuthenticationErrorConstants.USER_MISSING,
+                AuthenticationErrorConstants.ACCOUNT_UNAVAILABLE,
+                BusinessErrorKind.NotFound);
 
         return new(result);
     }

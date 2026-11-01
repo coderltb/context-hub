@@ -12,7 +12,10 @@ public static class DapperCommandOptionsHelper
     /// <param name="transaction">The optional borrowed transaction.</param>
     /// <returns>The immutable command settings.</returns>
     public static DapperCommandOptions CreateText(CancellationToken cancellationToken = default, IDbTransaction? transaction = null) =>
-        new() { CancellationToken = cancellationToken, Transaction = transaction };
+        new() {
+            CancellationToken = cancellationToken,
+            Transaction = transaction
+        };
 
     /// <summary>
     /// Requires an active EF transaction before borrowing its provider transaction.
@@ -20,7 +23,9 @@ public static class DapperCommandOptionsHelper
     /// <param name="dbContext">The caller-owned EF context.</param>
     /// <param name="cancellationToken">The command cancellation token.</param>
     /// <returns>Text settings tied to the caller transaction.</returns>
-    public static DapperCommandOptions CreateTransactionalText(DbContext dbContext, CancellationToken cancellationToken = default)
+    public static DapperCommandOptions CreateTransactionalText(
+        DbContext dbContext,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(dbContext);
 

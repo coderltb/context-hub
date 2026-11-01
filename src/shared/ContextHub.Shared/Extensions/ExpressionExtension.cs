@@ -13,7 +13,8 @@ public static class ExpressionExtension
     /// <param name="selectors">Required valid string selectors only when the keyword is active.</param>
     /// <returns>A provider-readable text predicate, or null when the keyword is absent.</returns>
     public static Expression<Func<TEntity, bool>>? SearchText<TEntity>(
-        string? searchTerm, params Expression<Func<TEntity, string?>>[]? selectors)
+        string? searchTerm,
+        params Expression<Func<TEntity, string?>>[]? selectors)
     {
         return SearchText(searchTerm, selectors, null);
     }
@@ -26,7 +27,8 @@ public static class ExpressionExtension
     /// <param name="selectors">Optional root or related-object string selectors.</param>
     /// <param name="collectionSelectors">Optional mapped collections of nullable strings, searched with Any.</param>
     /// <returns>The scalar/collection OR group, or null when no keyword is active.</returns>
-    public static Expression<Func<TEntity, bool>>? SearchText<TEntity>(string? searchTerm,
+    public static Expression<Func<TEntity, bool>>? SearchText<TEntity>(
+        string? searchTerm,
         Expression<Func<TEntity, string?>>[]? selectors,
         Expression<Func<TEntity, IEnumerable<string?>>>[]? collectionSelectors)
     {
@@ -47,8 +49,7 @@ public static class ExpressionExtension
             throw new ArgumentException(SharedErrorConstants.QueryErrors.TEXT_FIELDS_REQUIRED, nameof(selectors));
         }
 
-        // Capturing the keyword lets EF parameterize the value instead of embedding a new constant in each tree.
-        // Contains remains provider-native; no case conversion, wildcard language or client evaluation is added.
+        // Capture the keyword for EF parameterization while retaining provider-native Contains semantics.
         Expression<Func<string?, bool>> contains = value => value != null && value.Contains(searchTerm);
         Expression<Func<TEntity, bool>>? predicate = null;
         foreach (var selector in selectors ?? [])
@@ -58,12 +59,10 @@ public static class ExpressionExtension
             predicate = predicate.OrElse(condition);
         }
 
-        // Keep each collection as a provider-readable Any subquery: empty collections and null strings cannot match.
-        // Reuse the captured keyword and string condition; do not materialize children or rewrite caller field filters.
+        // Keep nested collections as native Any queries without loading children or changing field filters.
         foreach (var selector in collectionSelectors ?? [])
         {
-            var body = Expression.Call(typeof(Enumerable), nameof(Enumerable.Any), [typeof(string)],
-                selector.Body, contains);
+            var body = Expression.Call(typeof(Enumerable), nameof(Enumerable.Any), [typeof(string)], selector.Body, contains);
             var condition = Expression.Lambda<Func<TEntity, bool>>(body, selector.Parameters);
             predicate = predicate.OrElse(condition);
         }
@@ -103,7 +102,8 @@ public static class ExpressionExtension
     /// <param name="right">The additional condition, or null when it is not applicable.</param>
     /// <returns>A short-circuit conjunction, the sole condition, or null when both are absent.</returns>
     public static Expression<Func<T, bool>>? AndAlso<T>(
-        this Expression<Func<T, bool>>? left, Expression<Func<T, bool>>? right)
+        this Expression<Func<T, bool>>? left,
+        Expression<Func<T, bool>>? right)
     {
         return Combine(left, right, ExpressionType.AndAlso);
     }
@@ -116,7 +116,8 @@ public static class ExpressionExtension
     /// <param name="right">The alternative condition, or null when it is not applicable.</param>
     /// <returns>A short-circuit disjunction, the sole condition, or null when both are absent.</returns>
     public static Expression<Func<T, bool>>? OrElse<T>(
-        this Expression<Func<T, bool>>? left, Expression<Func<T, bool>>? right)
+        this Expression<Func<T, bool>>? left,
+        Expression<Func<T, bool>>? right)
     {
         return Combine(left, right, ExpressionType.OrElse);
     }
@@ -143,21 +144,21 @@ public static class ExpressionExtension
     /// <param name="operation">The short-circuit boolean operator selected by the public method.</param>
     /// <returns>The combined expression, preserving null and single-condition identities.</returns>
     private static Expression<Func<T, bool>>? Combine<T>(
-        Expression<Func<T, bool>>? left, Expression<Func<T, bool>>? right, ExpressionType operation)
+        Expression<Func<T, bool>>? left,
+        Expression<Func<T, bool>>? right,
+        ExpressionType operation)
     {
         if (left is null || right is null)
         {
             return left ?? right;
         }
 
-        // A fresh binding cannot collide with a nested parameter already present in either operand.
-        // Rebind both roots without invoking or compiling lambdas so EF still sees the complete tree.
+        // Rebind both roots with a fresh parameter to avoid nested collisions and preserve EF translation.
         var parameter = Expression.Parameter(typeof(T), "entity");
         var leftBody = new ParameterReplacementVisitor(left.Parameters[0], parameter).Visit(left.Body);
         var rightBody = new ParameterReplacementVisitor(right.Parameters[0], parameter).Visit(right.Body);
 
-        return Expression.Lambda<Func<T, bool>>(
-            Expression.MakeBinary(operation, leftBody, rightBody), parameter);
+        return Expression.Lambda<Func<T, bool>>(Expression.MakeBinary(operation, leftBody, rightBody), parameter);
     }
 
     /// <summary>
@@ -165,7 +166,9 @@ public static class ExpressionExtension
     /// </summary>
     /// <param name="source">The outer parameter used by the incoming condition.</param>
     /// <param name="target">The new outer parameter or selected field expression used in its place.</param>
-    private sealed class ParameterReplacementVisitor(ParameterExpression source, Expression target)
+    private sealed class ParameterReplacementVisitor(
+        ParameterExpression source,
+        Expression target)
         : ExpressionVisitor
     {
         /// <summary>

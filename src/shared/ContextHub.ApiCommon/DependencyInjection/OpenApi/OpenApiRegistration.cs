@@ -96,7 +96,8 @@ public sealed class OpenApiRegistration(IServiceCollection services)
     /// <param name="statusCode">The documented response status.</param>
     /// <param name="name">The unique variant name within that type and status.</param>
     /// <returns>This registration for further mappings.</returns>
-    public OpenApiRegistration Response<TResponse, TProvider>(int statusCode = StatusCodes.Status200OK,
+    public OpenApiRegistration Response<TResponse, TProvider>(
+        int statusCode = StatusCodes.Status200OK,
         string name = ApiCommonOpenApiConstants.DEFAULT_EXAMPLE_NAME)
         where TResponse : class where TProvider : class, IOpenApiExampleProvider<TResponse>
     {
@@ -125,7 +126,8 @@ public sealed class OpenApiRegistration(IServiceCollection services)
     /// <param name="successStatus">The actual successful status, including bodyless 204.</param>
     /// <param name="errorStatuses">The operation's explicitly supported business failures.</param>
     /// <returns>This registration for further mappings.</returns>
-    public OpenApiRegistration Operation<TRequest, TResponse>(int successStatus = StatusCodes.Status200OK,
+    public OpenApiRegistration Operation<TRequest, TResponse>(
+        int successStatus = StatusCodes.Status200OK,
         params int[] errorStatuses) where TRequest : class where TResponse : class
     {
         ArgumentNullException.ThrowIfNull(errorStatuses);
@@ -163,8 +165,12 @@ public sealed class OpenApiRegistration(IServiceCollection services)
     /// Takes a defensive snapshot so retained builder references cannot mutate document-generation mappings.
     /// </summary>
     /// <returns>An immutable-by-ownership registry containing only types and contract values.</returns>
-    internal OpenApiRegistry Build() => new(_requests.ToFrozenDictionary(), _values.ToFrozenDictionary(), _responses.ToFrozenDictionary(),
-        _operations.ToFrozenDictionary(), _apiErrors);
+    internal OpenApiRegistry Build() => new(
+        _requests.ToFrozenDictionary(),
+        _values.ToFrozenDictionary(),
+        _responses.ToFrozenDictionary(),
+        _operations.ToFrozenDictionary(),
+        _apiErrors);
 
     /// <summary>
     /// Enforces transient provider activation without overriding a conflicting host registration.

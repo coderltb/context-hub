@@ -11,7 +11,9 @@ public sealed class ApiResponse<T> : IApiResponse where T : class
     /// </summary>
     /// <param name="data">The successful result, or null.</param>
     /// <param name="error">The safe transport error, or null.</param>
-    public ApiResponse(T? data = null, ApiError? error = null)
+    public ApiResponse(
+        T? data = null,
+        ApiError? error = null)
     {
         // Derive the data branch from error presence so consumers never receive success data on a failure.
         Data = error is null ? data : null;

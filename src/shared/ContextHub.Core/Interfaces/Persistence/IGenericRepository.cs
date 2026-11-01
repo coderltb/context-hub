@@ -54,8 +54,10 @@ public interface IGenericRepository<TEntity>
     /// Use FirstOrDefaultAsync&lt;bool&gt; explicitly for boolean projections, preserving the existing predicate overload.
     /// </remarks>
     [OverloadResolutionPriority(-1)]
-    Task<TResult?> FirstOrDefaultAsync<TResult>(Expression<Func<TEntity, TResult>> selector,
-        Expression<Func<TEntity, bool>>? predicate = null, QueryOrder<TEntity>? order = null,
+    Task<TResult?> FirstOrDefaultAsync<TResult>(
+        Expression<Func<TEntity, TResult>> selector,
+        Expression<Func<TEntity, bool>>? predicate = null,
+        QueryOrder<TEntity>? order = null,
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default);
 
@@ -130,8 +132,10 @@ public interface IGenericRepository<TEntity>
     /// Use GetListAsync&lt;bool&gt; explicitly for boolean projections; a single bool lambda remains an entity predicate.
     /// </remarks>
     [OverloadResolutionPriority(-1)]
-    Task<IReadOnlyList<TResult>> GetListAsync<TResult>(Expression<Func<TEntity, TResult>> selector,
-        Expression<Func<TEntity, bool>>? predicate = null, QueryOrder<TEntity>? order = null,
+    Task<IReadOnlyList<TResult>> GetListAsync<TResult>(
+        Expression<Func<TEntity, TResult>> selector,
+        Expression<Func<TEntity, bool>>? predicate = null,
+        QueryOrder<TEntity>? order = null,
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default);
 
@@ -154,7 +158,9 @@ public interface IGenericRepository<TEntity>
     /// <param name="search">Optional typed text and field conditions combined with the predicate using AND.</param>
     /// <param name="cancellationToken">Stops the database operation.</param>
     /// <returns>The number of matching rows as a 64-bit count.</returns>
-    Task<long> CountAsync(Expression<Func<TEntity, bool>>? predicate = null, SearchOptions<TEntity>? search = null,
+    Task<long> CountAsync(
+        Expression<Func<TEntity, bool>>? predicate = null,
+        SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -183,8 +189,11 @@ public interface IGenericRepository<TEntity>
     /// <param name="search">Optional typed text and field conditions combined with the predicate using AND.</param>
     /// <param name="cancellationToken">Stops both sequential database reads.</param>
     /// <returns>A materialized page; concurrent writes may make its count differ from its items.</returns>
-    Task<PageResponse<TEntity>> GetPageAsync(PageRequest page, QueryOrder<TEntity>? order = null,
-        Expression<Func<TEntity, bool>>? predicate = null, SearchOptions<TEntity>? search = null,
+    Task<PageResponse<TEntity>> GetPageAsync(
+        PageRequest page,
+        QueryOrder<TEntity>? order = null,
+        Expression<Func<TEntity, bool>>? predicate = null,
+        SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -198,8 +207,11 @@ public interface IGenericRepository<TEntity>
     /// <param name="search">Optional typed text and field conditions combined with the predicate using AND.</param>
     /// <param name="cancellationToken">Stops both sequential database reads.</param>
     /// <returns>The projected page and the count observed before its items query.</returns>
-    Task<PageResponse<TResult>> GetPageAsync<TResult>(Expression<Func<TEntity, TResult>> selector,
-        PageRequest page, QueryOrder<TEntity>? order = null, Expression<Func<TEntity, bool>>? predicate = null,
+    Task<PageResponse<TResult>> GetPageAsync<TResult>(
+        Expression<Func<TEntity, TResult>> selector,
+        PageRequest page,
+        QueryOrder<TEntity>? order = null,
+        Expression<Func<TEntity, bool>>? predicate = null,
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default);
 

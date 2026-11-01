@@ -30,7 +30,9 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
     /// </summary>
     /// <param name="clock">The time provider.</param>
     /// <param name="logger">The metadata logger.</param>
-    public InMemoryAtomicCacheService(TimeProvider clock, ILogger<InMemoryAtomicCacheService> logger)
+    public InMemoryAtomicCacheService(
+        TimeProvider clock,
+        ILogger<InMemoryAtomicCacheService> logger)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(logger);
@@ -47,7 +49,11 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
     /// <param name="expiration">A strictly positive fixed lifetime.</param>
     /// <param name="cancellationToken">Cancels before the process-local reservation is changed.</param>
     /// <returns>True only when the reservation was created.</returns>
-    public Task<bool> TrySetIfAbsentAsync(string key, string value, TimeSpan expiration, CancellationToken cancellationToken = default)
+    public Task<bool> TrySetIfAbsentAsync(
+        string key,
+        string value,
+        TimeSpan expiration,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(value);
         AtomicCacheService.Validate(key, expiration);
@@ -56,7 +62,10 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
         SweepExpiredEntries();
         cancellationToken.ThrowIfCancellationRequested();
         var proposed = new Entry(value, _clock.GetUtcNow().Add(expiration));
-        var stored = _entries.AddOrUpdate(key, proposed, (_, current) =>
+        var stored = _entries.AddOrUpdate(
+            key,
+            proposed,
+            (_, current) =>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -75,7 +84,10 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
     /// <param name="expiration">The lifetime assigned only on first creation.</param>
     /// <param name="cancellationToken">The cancellation token; no automatic retry is performed.</param>
     /// <returns>The new counter value.</returns>
-    public Task<long> IncrementAsync(string key, TimeSpan expiration, CancellationToken cancellationToken = default)
+    public Task<long> IncrementAsync(
+        string key,
+        TimeSpan expiration,
+        CancellationToken cancellationToken = default)
     {
         AtomicCacheService.Validate(key, expiration);
         cancellationToken.ThrowIfCancellationRequested();
@@ -84,7 +96,8 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
         cancellationToken.ThrowIfCancellationRequested();
 
         // Native update callbacks may replay; they only construct immutable snapshots.
-        var stored = _entries.AddOrUpdate(key,
+        var stored = _entries.AddOrUpdate(
+            key,
             _ =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -116,7 +129,9 @@ public sealed class InMemoryAtomicCacheService : IAtomicCacheService
     /// <param name="key">The exact service-owned key.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task completing after removal.</returns>
-    public Task RemoveAsync(string key, CancellationToken cancellationToken = default)
+    public Task RemoveAsync(
+        string key,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         cancellationToken.ThrowIfCancellationRequested();

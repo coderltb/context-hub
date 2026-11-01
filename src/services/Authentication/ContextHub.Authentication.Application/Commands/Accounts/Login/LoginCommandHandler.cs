@@ -12,7 +12,9 @@ public sealed class LoginCommandHandler(IAccountService accountService) : IReque
     /// <param name="request">The submitted SSO proof.</param>
     /// <param name="cancellationToken">Stops dispatch before native credential handling.</param>
     /// <returns>Whether the account operation succeeded.</returns>
-    public async ValueTask<bool> Handle(LoginCommand request, CancellationToken cancellationToken)
+    public async ValueTask<bool> Handle(
+        LoginCommand request,
+        CancellationToken cancellationToken)
     {
         // Native Identity login APIs do not accept cancellation.
         cancellationToken.ThrowIfCancellationRequested();

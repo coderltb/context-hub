@@ -78,7 +78,9 @@ public sealed class UsersController(IMediator mediator) : BaseApiController(medi
         NoStore = true,
         Location = ResponseCacheLocation.None,
         Order = ApiValueConstants.SENSITIVE_RESPONSE_CACHE_ORDER)]
-    public async Task<IActionResult> Create(CreateUserRequestDto request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(
+        CreateUserRequestDto request,
+        CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(new CreateUserCommand(request), cancellationToken);
 

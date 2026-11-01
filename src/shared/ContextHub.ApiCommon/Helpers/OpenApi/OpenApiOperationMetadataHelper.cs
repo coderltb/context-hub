@@ -29,15 +29,15 @@ internal static class OpenApiOperationMetadataHelper
     /// <param name="registry">The host's optional mappings.</param>
     /// <returns>The matching pair and statuses, or null when no contract applies.</returns>
     internal static KeyValuePair<(Type Request, Type Response), OpenApiOperationContract>? Contract(
-        OpenApiOperationTransformerContext context, OpenApiRegistry? registry)
+        OpenApiOperationTransformerContext context,
+        OpenApiRegistry? registry)
     {
         if (registry is null)
         {
             return null;
         }
 
-        // MVC expands complex query DTOs into parameter descriptions; retain their original descriptor type for pairing.
-        // Service parameters never identify a request contract, even when their CLR type matches a registered DTO.
+        // Retain expanded query DTO types for pairing and exclude service-bound parameters.
         var requestTypes = context.Description.ParameterDescriptions
             .Where(parameter => parameter.Source != BindingSource.Services)
             .SelectMany(parameter => new[] { parameter.Type, parameter.ParameterDescriptor.ParameterType })
@@ -65,8 +65,7 @@ internal static class OpenApiOperationMetadataHelper
             throw new InvalidOperationException(ApiCommonErrorConstants.OpenApiErrors.INVALID_CONTRACT);
         }
 
-        return overrides.Length == 0 ? matches[0] : new(matches[0].Key,
-            new(overrides[0].SuccessStatus, overrides[0].ErrorStatuses));
+        return overrides.Length == 0 ? matches[0] : new(matches[0].Key, new(overrides[0].SuccessStatus, overrides[0].ErrorStatuses));
     }
 
     /// <summary>
@@ -76,7 +75,10 @@ internal static class OpenApiOperationMetadataHelper
     /// <param name="registry">The optional type registry.</param>
     /// <param name="status">The documented response status.</param>
     /// <returns>The payload type, or null for an unknown or bodyless response.</returns>
-    internal static Type? ResponseType(OpenApiOperationTransformerContext context, OpenApiRegistry? registry, int status)
+    internal static Type? ResponseType(
+        OpenApiOperationTransformerContext context,
+        OpenApiRegistry? registry,
+        int status)
     {
         if (status == StatusCodes.Status204NoContent)
         {
@@ -85,8 +87,7 @@ internal static class OpenApiOperationMetadataHelper
 
         var nativeType = context.Description.SupportedResponseTypes.FirstOrDefault(response => response.StatusCode == status)?.Type;
 
-        // Inferred framework errors become the shared envelope only when the host declares that adapter boundary.
-        // A concrete payload type overrides the shared schema; declaring only a status keeps the standard error body.
+        // Apply shared errors only inside the declared boundary; explicit payload types retain their schema.
         if (registry?.ApiErrors == true && status.IsSupportedApiError() &&
             !ExplicitStatuses(context, requirePayloadType: true).Contains(status))
         {

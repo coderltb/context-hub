@@ -11,8 +11,7 @@ public sealed class SafeActivityProcessor : BaseProcessor<Activity>
     /// <param name="activity">The completed operation.</param>
     public override void OnEnd(Activity activity)
     {
-        // Activity events and links are immutable here. Do not export a span that cannot be scrubbed safely.
-        // Standard OpenTelemetry activity export processors skip non-recorded spans.
+        // Skip immutable spans that cannot be scrubbed safely; native exporters respect the recording flag.
         if (activity.Events.Any() || activity.Links.Any())
         {
             activity.ActivityTraceFlags &= ~ActivityTraceFlags.Recorded;

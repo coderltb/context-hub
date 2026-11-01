@@ -46,8 +46,8 @@ public sealed class AuthenticationDesignSchemaPostgreSqlTests
         Assert.Equal(await ReadShapeAsync(container.GetConnectionString()), await ReadShapeAsync(designedConnection.ConnectionString));
         await using var design = new NpgsqlConnection(designedConnection.ConnectionString);
         await design.OpenAsync();
-        Assert.Equal(20L, await design.ExecuteScalarAsync<long>("SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_type='BASE TABLE'"));
-        Assert.Equal(188L, await design.ExecuteScalarAsync<long>("SELECT count(*) FROM information_schema.columns WHERE table_schema IN ('identity','openiddict','authentication','catalog','integration','access','telemetry','recommendation')"));
+        Assert.Equal(21L, await design.ExecuteScalarAsync<long>("SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_type='BASE TABLE'"));
+        Assert.Equal(203L, await design.ExecuteScalarAsync<long>("SELECT count(*) FROM information_schema.columns WHERE table_schema IN ('identity','openiddict','authentication','catalog','integration','access','telemetry','recommendation')"));
         Assert.Equal(13L, await design.ExecuteScalarAsync<long>("SELECT count(*) FROM pg_constraint WHERE contype='f'"));
         Assert.Equal(0L, await design.ExecuteScalarAsync<long>("SELECT count(*) FROM pg_constraint WHERE contype='f' AND conrelid='telemetry.\"DailyUsage\"'::regclass AND confrelid='authentication.\"Client\"'::regclass"));
 

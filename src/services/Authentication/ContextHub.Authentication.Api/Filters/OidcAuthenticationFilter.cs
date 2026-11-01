@@ -12,7 +12,9 @@ public sealed class OidcAuthenticationFilter(OidcAuthenticationOperation operati
     /// <param name="context">The current HTTP action and native protocol context.</param>
     /// <param name="next">The action continuation after authentication.</param>
     /// <returns>The native challenge/rejection or the authenticated action execution.</returns>
-    public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    public async Task OnActionExecutionAsync(
+        ActionExecutingContext context,
+        ActionExecutionDelegate next)
     {
         var http = context.HttpContext;
         var scheme = operation switch
@@ -51,7 +53,9 @@ public sealed class OidcAuthenticationFilter(OidcAuthenticationOperation operati
         else if (operation != OidcAuthenticationOperation.Logout)
         {
             context.Result = operation == OidcAuthenticationOperation.Authorize
-                ? new ChallengeResult(IdentityConstants.ApplicationScheme, new AuthenticationProperties
+                ? new ChallengeResult(
+                    IdentityConstants.ApplicationScheme,
+                    new AuthenticationProperties
                 {
                     RedirectUri = http.Request.Path + http.Request.QueryString
                 })

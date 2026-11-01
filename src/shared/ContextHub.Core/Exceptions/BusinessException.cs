@@ -11,7 +11,10 @@ public class BusinessException : Exception
     /// <param name="errorCode">The feature-owned internal error identifier.</param>
     /// <param name="publicMessage">The explicit description; global HTTP handling deliberately does not publish it.</param>
     /// <param name="kind">The neutral failure category interpreted by the selected transport adapter.</param>
-    public BusinessException(string errorCode, string publicMessage, BusinessErrorKind kind = BusinessErrorKind.Invalid)
+    public BusinessException(
+        string errorCode,
+        string publicMessage,
+        BusinessErrorKind kind = BusinessErrorKind.Invalid)
         : base(publicMessage)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);

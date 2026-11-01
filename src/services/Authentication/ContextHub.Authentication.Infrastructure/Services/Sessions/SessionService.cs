@@ -35,7 +35,10 @@ public sealed class SessionService(
     /// <param name="sessionId">The protected browser-session binding.</param>
     /// <param name="cancellationToken">Cancels the authoritative database read.</param>
     /// <returns>Whether this authenticated session has not been logged out.</returns>
-    public async Task<bool> IsSessionActiveAsync(string? subject, string? sessionId, CancellationToken cancellationToken)
+    public async Task<bool> IsSessionActiveAsync(
+        string? subject,
+        string? sessionId,
+        CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(subject, out var userId) || string.IsNullOrEmpty(sessionId))
         {
@@ -57,7 +60,8 @@ public sealed class SessionService(
         AuthorizationGrantModel request,
         CancellationToken cancellationToken)
     {
-        return await unitOfWork.ExecuteInTransactionAsync<ClaimsPrincipal?>(async token =>
+        return await unitOfWork.ExecuteInTransactionAsync<ClaimsPrincipal?>(
+            async token =>
         {
             // Serialize the marker read with logout so an overlapping request cannot restore a revoked session.
             if (!await IsSessionActiveAsync(user.Id.ToString(), request.SessionId, token))
@@ -65,7 +69,7 @@ public sealed class SessionService(
                 return null;
             }
 
-            // Build an explicit allowlist from the already-approved account and grant model; do not map a complete Identity entity into claims.
+            // Build claims only from approved account and grant fields.
             var identity = new ClaimsIdentity(AuthenticationConstants.BEARER_TOKEN_TYPE, Claims.Name, Claims.Role);
             var principal = new ClaimsPrincipal(identity);
             principal.SetClaim(Claims.Subject, user.Id.ToString());
@@ -76,13 +80,13 @@ public sealed class SessionService(
             principal.SetScopes(request.Scopes);
             principal.SetResources(AuthenticationConstants.RESOURCE);
 
-            // Only protocol-approved public claims receive destinations; password hashes and security stamps never enter tokens.
+            // Assign destinations only to protocol-approved public claims.
             foreach (var claim in principal.Claims)
             {
                 claim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
             }
 
-            // Persist a separate authorization family for this cookie session, rather than sharing one across devices.
+            // Bind each cookie session to its own authorization family.
             var application = await applicationManager.FindByClientIdAsync(request.ClientId, token);
 
             if (application is null)
@@ -94,7 +98,7 @@ public sealed class SessionService(
                 throw new InvalidOperationException(AuthenticationErrorConstants.PROTOCOL_CLIENT_UNAVAILABLE);
             }
 
-            // Attach the approved principal to its own native authorization family, with session metadata used for scoped logout.
+            // Store session metadata for scoped grant revocation.
             var descriptor = new OpenIddictAuthorizationDescriptor
             {
                 ApplicationId = await applicationManager.GetIdAsync(application, token),
@@ -108,11 +112,13 @@ public sealed class SessionService(
             descriptor.Properties[AuthenticationConstants.SESSION_ID] = JsonSerializer.SerializeToElement(request.SessionId);
             var authorization = await authorizationManager.CreateAsync(descriptor, token);
 
-            // Associate subsequently issued tokens with this authorization so revocation can address the same family.
+            // Bind issued tokens to this revocable authorization family.
             principal.SetAuthorizationId(await authorizationManager.GetIdAsync(authorization, token));
 
             return principal;
-        }, IsolationLevel.Serializable, cancellationToken);
+        },
+            IsolationLevel.Serializable,
+            cancellationToken);
     }
 
     /// <summary>
@@ -125,14 +131,20 @@ public sealed class SessionService(
         SessionRevocationModel session,
         CancellationToken cancellationToken)
     {
-        await unitOfWork.ExecuteInTransactionAsync(async token =>
+        await unitOfWork.ExecuteInTransactionAsync(
+            async token =>
         {
             // Keep logout durable even when the cookie has never created an OpenIddict family.
             var user = await userManager.FindByIdAsync(session.Subject);
             if (user is not null && !(await userManager.SetAuthenticationTokenAsync(
-                user, AuthenticationInfrastructureConstants.SSO_REVOCATION_PROVIDER, session.SessionId, string.Empty)).Succeeded)
+                user,
+                AuthenticationInfrastructureConstants.SSO_REVOCATION_PROVIDER,
+                session.SessionId,
+                string.Empty)).Succeeded)
             {
-                logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(RevokeSessionAsync),
+                logger.LogWarning(
+                    AuthenticationLogConstants.OPERATION_REJECTED,
+                    nameof(RevokeSessionAsync),
                     AuthenticationErrorConstants.GRANT_REVOCATION_FAILED);
                 throw new InvalidOperationException(AuthenticationErrorConstants.GRANT_REVOCATION_FAILED);
             }
@@ -153,7 +165,9 @@ public sealed class SessionService(
                 if (!await authorizationManager.TryRevokeAsync(authorization, token))
                 {
                     token.ThrowIfCancellationRequested();
-                    logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(RevokeSessionAsync),
+                    logger.LogWarning(
+                        AuthenticationLogConstants.OPERATION_REJECTED,
+                        nameof(RevokeSessionAsync),
                         AuthenticationErrorConstants.GRANT_REVOCATION_FAILED);
                     throw new InvalidOperationException(AuthenticationErrorConstants.GRANT_REVOCATION_FAILED);
                 }
@@ -161,7 +175,9 @@ public sealed class SessionService(
                 var authorizationId = await authorizationManager.GetIdAsync(authorization, token);
                 await tokenManager.RevokeByAuthorizationIdAsync(authorizationId!, token);
             }
-        }, IsolationLevel.Serializable, cancellationToken);
+        },
+            IsolationLevel.Serializable,
+            cancellationToken);
 
         // The controller clears the cookie only after this committed security operation returns successfully.
         logger.LogInformation(AuthenticationLogConstants.OPERATION_COMPLETED, nameof(RevokeSessionAsync));
@@ -173,7 +189,9 @@ public sealed class SessionService(
     /// <param name="id">The human account identifier.</param>
     /// <param name="cancellationToken">Cancels lifecycle updates.</param>
     /// <returns>The revocation operation.</returns>
-    public async Task RevokeAllAsync(Guid id, CancellationToken cancellationToken)
+    public async Task RevokeAllAsync(
+        Guid id,
+        CancellationToken cancellationToken)
     {
         // Native bulk operations share the caller's UoW transaction and propagate provider errors and cancellation.
         var subject = id.ToString();

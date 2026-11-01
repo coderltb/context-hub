@@ -21,6 +21,8 @@ global using ContextHub.Shared.Dtos.Requests;
 global using ContextHub.Shared.Dtos.Responses;
 global using ContextHub.Shared.Extensions;
 
+global using ContextHub.Shared.Models.Persistence;
+
 global using ContextHub.Shared.Interfaces.Auditing;
 global using ContextHub.Shared.Interfaces.Responses;
 

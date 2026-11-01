@@ -26,7 +26,10 @@ public sealed class AuthService : IAuthService
     /// <param name="http">The request-local context accessor.</param>
     /// <param name="options">The normalized claim options.</param>
     /// <param name="logger">The safe metadata logger.</param>
-    public AuthService(IHttpContextAccessor http, IOptions<CurrentUserOptions> options, ILogger<AuthService> logger)
+    public AuthService(
+        IHttpContextAccessor http,
+        IOptions<CurrentUserOptions> options,
+        ILogger<AuthService> logger)
     {
         ArgumentNullException.ThrowIfNull(http);
         ArgumentNullException.ThrowIfNull(options);
@@ -70,7 +73,10 @@ public sealed class AuthService : IAuthService
     /// <param name="value">The converted value on success.</param>
     /// <param name="provider">The optional conversion culture.</param>
     /// <returns>True only when a claim exists and conversion succeeds.</returns>
-    public bool TryGet<T>(string claimType, out T? value, IFormatProvider? provider = null) 
+    public bool TryGet<T>(
+        string claimType,
+        out T? value,
+        IFormatProvider? provider = null) 
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);
 

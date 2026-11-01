@@ -71,7 +71,6 @@ global using ContextHub.Authentication.Application.Dtos.Accounts;
 
 global using ContextHub.Authentication.Application.Commands.Users.InviteUser;
 
-
 global using ContextHub.Authentication.Application.Commands.Accounts.ForgotPassword;
 
 global using ContextHub.Authentication.Application.Commands.Accounts.VerifyPasswordResetOtp;

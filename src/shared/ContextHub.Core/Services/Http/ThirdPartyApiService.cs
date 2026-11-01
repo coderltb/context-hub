@@ -3,12 +3,12 @@ namespace ContextHub.Core.Services.Http;
 /// <summary>
 /// Keeps the reference third-party flow with DI-managed transport, startup mappings and Newtonsoft serialization.
 /// </summary>
-/// <param name="restClient">The named-client transport owning each outgoing request.</param>
-/// <param name="serializer">The shared JSON contract used for typed responses.</param>
+/// <param name="restClientService">The named-client transport owning each outgoing request.</param>
+/// <param name="jsonSerializerService">The shared JSON contract used for typed responses.</param>
 /// <param name="logger">The provider logger receiving credential-masked request and response text.</param>
 public class ThirdPartyApiService(
-    IRestClientMultipleService restClient,
-    IJsonSerializerService serializer,
+    IRestClientMultipleService restClientService,
+    IJsonSerializerService jsonSerializerService,
     ILogger<ThirdPartyApiService> logger) : IThirdPartyApiService
 {
     /// <summary>
@@ -18,14 +18,16 @@ public class ThirdPartyApiService(
     /// <param name="request">The integration DTO; private and upload properties are excluded by its JSON contract.</param>
     /// <param name="cancellationToken">Cancellation propagated through dispatch and bounded content consumption.</param>
     /// <returns>The successful provider payload with only identified credential values masked.</returns>
-    public virtual async Task<string> HandleApiData<TRequest>(TRequest request, CancellationToken cancellationToken = default)
+    public virtual async Task<string> HandleApiData<TRequest>(
+        TRequest request,
+        CancellationToken cancellationToken = default)
         where TRequest : BaseThirdPartyApiRequest
     {
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
         // Follow the reference flow: serialize once, mask credentials and let the configured logger filter its level.
-        var requestJson = serializer.Serialize(request);
+        var requestJson = jsonSerializerService.Serialize(request);
         var maskedRequest = LogMaskingHelper.MaskAllSensitiveData(requestJson);
 
         logger.LogInformation(CoreLogConstants.HttpLogs.PROVIDER_STARTED, typeof(TRequest).Name, maskedRequest);
@@ -46,13 +48,21 @@ public class ThirdPartyApiService(
         // Preserve the upstream status but never include provider credentials or body text in the public exception.
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogError(CoreLogConstants.HttpLogs.PROVIDER_FAILED, typeof(TRequest).Name, (int)response.StatusCode, maskedContent);
+            logger.LogError(
+                CoreLogConstants.HttpLogs.PROVIDER_FAILED,
+                typeof(TRequest).Name,
+                (int)response.StatusCode,
+                maskedContent);
 
             throw new HttpRequestException(CoreErrorConstants.HttpErrors.PROVIDER_FAILED, null, response.StatusCode);
         }
 
         // Non-secret response fields remain available; masking applies equally to raw text and the typed overload below.
-        logger.LogInformation(CoreLogConstants.HttpLogs.PROVIDER_COMPLETED, typeof(TRequest).Name, (int)response.StatusCode, maskedContent);
+        logger.LogInformation(
+            CoreLogConstants.HttpLogs.PROVIDER_COMPLETED,
+            typeof(TRequest).Name,
+            (int)response.StatusCode,
+            maskedContent);
 
         return maskedContent;
     }
@@ -65,12 +75,14 @@ public class ThirdPartyApiService(
     /// <param name="request">The configured integration request.</param>
     /// <param name="cancellationToken">Cancellation for dispatch and response consumption.</param>
     /// <returns>The credential-masked response, or null when the successful JSON payload represents no value.</returns>
-    public virtual async Task<TResponse?> HandleApiData<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken = default)
+    public virtual async Task<TResponse?> HandleApiData<TRequest, TResponse>(
+        TRequest request,
+        CancellationToken cancellationToken = default)
         where TRequest : BaseThirdPartyApiRequest
     {
         var content = await HandleApiData(request, cancellationToken);
 
-        return serializer.Deserialize<TResponse>(content);
+        return jsonSerializerService.Deserialize<TResponse>(content);
     }
 
     /// <summary>
@@ -93,11 +105,11 @@ public class ThirdPartyApiService(
         // Normalize only the verb locally; do not rewrite the caller's DTO or serialize its extension properties.
         return request.Method.ToUpperInvariant() switch
         {
-            "GET" => restClient.GetAsync(dto, cancellationToken),
-            "POST" => restClient.PostAsync(dto, cancellationToken),
-            "PUT" => restClient.PutAsync(dto, cancellationToken),
-            "PATCH" => restClient.PatchAsync(dto, cancellationToken),
-            "DELETE" => restClient.DeleteAsync(dto, cancellationToken),
+            "GET" => restClientService.GetAsync(dto, cancellationToken),
+            "POST" => restClientService.PostAsync(dto, cancellationToken),
+            "PUT" => restClientService.PutAsync(dto, cancellationToken),
+            "PATCH" => restClientService.PatchAsync(dto, cancellationToken),
+            "DELETE" => restClientService.DeleteAsync(dto, cancellationToken),
             _ => throw new ArgumentException(CoreErrorConstants.HttpErrors.METHOD_NOT_SUPPORTED, nameof(request))
         };
     }

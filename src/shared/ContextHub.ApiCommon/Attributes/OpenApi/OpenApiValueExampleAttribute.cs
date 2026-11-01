@@ -32,5 +32,7 @@ public abstract class OpenApiValueExampleAttribute(Type providerType, OpenApiVal
 /// <param name="target">The actual native binding location.</param>
 /// <param name="name">The explicit binding name.</param>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class OpenApiValueExampleAttribute<TProvider>(OpenApiValueTarget target, string name)
+public sealed class OpenApiValueExampleAttribute<TProvider>(
+    OpenApiValueTarget target,
+    string name)
     : OpenApiValueExampleAttribute(typeof(TProvider), target, name) where TProvider : IOpenApiExampleProvider;

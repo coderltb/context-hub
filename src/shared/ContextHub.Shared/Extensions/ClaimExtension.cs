@@ -12,7 +12,11 @@ public static class ClaimExtension
     /// <param name="claims">The separate destination list to normalize.</param>
     /// <param name="fromType">The source claim type selected by the caller.</param>
     /// <param name="toType">The destination alias type to replace.</param>
-    public static void ReplaceClaim(this ClaimsIdentity source, List<Claim> claims, string fromType, string toType)
+    public static void ReplaceClaim(
+        this ClaimsIdentity source,
+        List<Claim> claims,
+        string fromType,
+        string toType)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(claims);
@@ -26,8 +30,7 @@ public static class ClaimExtension
             return;
         }
 
-        // Claim.Type is immutable. Copy issuer metadata and properties into an unbound alias;
-        // the destination ClaimsIdentity owns its Subject when the caller adds or rebuilds that identity.
+        // Copy immutable claim metadata into an unbound alias so its destination identity owns the Subject.
         var alias = new Claim(toType, original.Value, original.ValueType, original.Issuer, original.OriginalIssuer);
         foreach (var property in original.Properties)
         {
@@ -45,7 +48,10 @@ public static class ClaimExtension
     /// <param name="identity">The identity receiving the claim; authentication state is not changed.</param>
     /// <param name="claimType">The claim type to preserve without recasing.</param>
     /// <param name="claimValue">The claim value to preserve without normalization.</param>
-    public static void EnsureClaim(this ClaimsIdentity identity, string claimType, string claimValue)
+    public static void EnsureClaim(
+        this ClaimsIdentity identity,
+        string claimType,
+        string claimValue)
     {
         ArgumentNullException.ThrowIfNull(identity);
         ArgumentException.ThrowIfNullOrWhiteSpace(claimType);

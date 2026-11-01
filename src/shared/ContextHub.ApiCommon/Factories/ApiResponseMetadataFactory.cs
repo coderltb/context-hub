@@ -5,7 +5,9 @@ namespace ContextHub.ApiCommon.Factories;
 /// </summary>
 /// <param name="timeProvider">The host-owned time provider.</param>
 /// <param name="boundary">The immutable response version selected by this host.</param>
-public sealed class ApiResponseMetadataFactory(TimeProvider timeProvider, ApiResponseBoundary boundary)
+public sealed class ApiResponseMetadataFactory(
+    TimeProvider timeProvider,
+    ApiResponseBoundary boundary)
 {
     /// <summary>
     /// Creates metadata for the current request; a wrong middleware order fails explicitly.

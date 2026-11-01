@@ -15,7 +15,9 @@ public sealed class RevokeSessionCommandHandler(
     /// <param name="request">The use-case marker; subject and session come from the selected cookie accessor.</param>
     /// <param name="cancellationToken">Cancels native revocation work.</param>
     /// <returns>The completed command marker without a REST envelope.</returns>
-    public async ValueTask<Unit> Handle(RevokeSessionCommand request, CancellationToken cancellationToken)
+    public async ValueTask<Unit> Handle(
+        RevokeSessionCommand request,
+        CancellationToken cancellationToken)
     {
         var subject = authService.Get<string>(ClaimTypes.NameIdentifier);
         var sessionId = authService.Get<string>(AuthenticationConstants.SESSION_ID);

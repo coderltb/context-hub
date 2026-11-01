@@ -59,6 +59,7 @@ public sealed class OwnerEnrollmentTests : IAsyncLifetime
         });
         builder.Services.AddLoggingInfrastructure(builder.Configuration, "authentication-enrollment-tests", Environments.Development);
         builder.Services.AddAuthenticationApi(builder.Configuration, builder.Environment);
+        builder.Services.AddPostgreSqlFixture<AuthenticationDbContext>(_database.GetConnectionString());
         builder.Services.AddDbContext<AuthenticationDbContext>((_, options) => options.AddInterceptors(_sessionFailure, _provisioningBarrier, _schemaCreation));
         _app = builder.Build();
         using var scope = _app.Services.CreateScope();
