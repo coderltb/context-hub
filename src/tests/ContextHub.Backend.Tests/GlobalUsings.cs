@@ -318,3 +318,12 @@ global using HubAuthAccessor = ContextHub.ApiCommon.Services.Authentication.Auth
 global using ContextHub.Infrastructure.Interfaces.Telemetry;
 global using ContextHub.Application.Dtos.Telemetry;
 global using ContextHub.Application.Policies.Integration;
+global using ContextHub.Backend.Tests.Services.EndToEnd.Fixtures;
+global using ContextHub.Application.Dtos.Mcp;
+global using ContextHub.Api.Extensions;
+global using Microsoft.Extensions.Http;
+global using ModelContextProtocol;
+global using ModelContextProtocol.Client;
+global using ModelContextProtocol.Protocol;
+global using AuthenticationProtocolFixture = ContextHub.Backend.Tests.Services.Authentication.AuthenticationProtocolPostgreSqlTests;
+global using HubApiRegistration = ContextHub.Api.DependencyInjection.ApiServiceRegistration;
