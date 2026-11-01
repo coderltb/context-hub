@@ -36,8 +36,7 @@ public sealed class ValidationBehavior<TRequest, TResponse>(
             return await next(message, cancellationToken);
         }
 
-        // Validators can share a scoped DbContext: parallel execution would violate its single-operation boundary.
-        // Give each validator a fresh context so failures and mutable rule state cannot leak between validators.
+        // Run scoped validators sequentially with fresh validation contexts to isolate mutable state.
         var results = new List<ValidationResult>(validatorList.Count);
         foreach (var validator in validatorList)
         {
@@ -48,10 +47,7 @@ public sealed class ValidationBehavior<TRequest, TResponse>(
         var errors = results
             .SelectMany(result => result.Errors)
             .Where(failure => failure is not null)
-            .Select(failure => new ValidationError(
-                failure.PropertyName,
-                failure.ErrorCode,
-                failure.ErrorMessage))
+            .Select(failure => new ValidationError(failure.PropertyName, failure.ErrorCode, failure.ErrorMessage))
             .Distinct()
             .ToArray();
 

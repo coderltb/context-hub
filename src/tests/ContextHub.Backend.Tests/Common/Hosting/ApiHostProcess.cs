@@ -91,6 +91,16 @@ internal sealed class ApiHostProcess : IAsyncDisposable
             start.Environment["Observability__Logging__ConsoleFormat"] = format;
         }
 
+        if (service == "ContextHub")
+        {
+            // Logging smoke uses only test-owned unavailable dependencies, never the developer's local database or keys.
+            start.Environment["ConnectionStrings__ContextHub"] = "Host=127.0.0.1;Port=1;Database=unused_logging_smoke;Username=unused;Timeout=1";
+            start.Environment["Authentication__Authority"] = "https://authority.test/";
+            start.Environment["Authentication__ClientSecret"] = "test-backchannel-only";
+            start.Environment["CacheSettings__RedisSettings__Host"] = "127.0.0.1";
+            start.Environment["CacheSettings__RedisSettings__Port"] = "1";
+        }
+
         if (service == "Authentication")
         {
             // The child host receives only test-owned keys, independently of local credential files.

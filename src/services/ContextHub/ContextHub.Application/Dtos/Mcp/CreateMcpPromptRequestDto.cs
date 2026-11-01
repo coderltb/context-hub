@@ -1,0 +1,37 @@
+namespace ContextHub.Application.Dtos.Mcp;
+
+/// <summary>
+/// Carries approved MCP configuration without persistence entities.
+/// </summary>
+public sealed record CreateMcpPromptRequestDto
+{
+    /// <summary>
+    /// Gets the immutable snake_case MCP identifier.
+    /// </summary>
+    public string Name { get; init; } = "";
+
+    /// <summary>
+    /// Gets the optional display title.
+    /// </summary>
+    public string? Title { get; init; }
+
+    /// <summary>
+    /// Gets the optional discovery description.
+    /// </summary>
+    public string? Description { get; init; }
+
+    /// <summary>
+    /// Gets plain guidance text; no template code is executed.
+    /// </summary>
+    public string Content { get; init; } = "";
+
+    /// <summary>
+    /// Gets ordered argument definitions, never submitted argument values.
+    /// </summary>
+    public IReadOnlyList<McpPromptArgumentDto?> Arguments { get; init; } = [];
+
+    /// <summary>
+    /// Gets whether discovery and retrieval are enabled.
+    /// </summary>
+    public bool IsEnabled { get; init; } = true;
+}

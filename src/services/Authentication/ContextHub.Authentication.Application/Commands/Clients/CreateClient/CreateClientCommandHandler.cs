@@ -5,7 +5,9 @@ namespace ContextHub.Authentication.Application.Commands.Clients.CreateClient;
 /// </summary>
 /// <param name="clientService">The Infrastructure service port using Application contracts.</param>
 /// <param name="logger">The safe operation logger.</param>
-public sealed class CreateClientCommandHandler(IClientService clientService, ILogger<CreateClientCommandHandler> logger)
+public sealed class CreateClientCommandHandler(
+    IClientService clientService,
+    ILogger<CreateClientCommandHandler> logger)
     : IRequestHandler<CreateClientCommand, ApiResponse<IssuedClientTokenResponseDto>>
 {
     /// <summary>

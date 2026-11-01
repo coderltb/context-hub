@@ -24,7 +24,7 @@ public static class ApiApplicationExtensions
     /// <param name="app">The host pipeline enabling interactive documentation.</param>
     /// <param name="configure">The host-specific document and authentication settings.</param>
     /// <returns>The same application pipeline.</returns>
-    public static IApplicationBuilder UseApiSwaggerUI(
+    public static IApplicationBuilder UseApiSwaggerUi(
         this IApplicationBuilder app,
         Action<SwaggerUIOptions> configure)
     {
@@ -67,10 +67,11 @@ public static class ApiApplicationExtensions
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // The exception adapter sees failures from downstream routing/auth; status pages handle bodyless native failures.
-        // Branch the adapters themselves, not just their output, so native protocol failures keep their original pipeline.
+        // Branch both adapters so routing/auth errors are handled only inside the REST boundary.
         var boundary = app.ApplicationServices.GetRequiredService<ApiResponseBoundary>();
-        app.UseWhen(context => boundary.Contains(context.Request.Path), branch =>
+        app.UseWhen(
+            context => boundary.Contains(context.Request.Path),
+            branch =>
         {
             branch.UseExceptionHandler();
             branch.UseApiStatusCodes();

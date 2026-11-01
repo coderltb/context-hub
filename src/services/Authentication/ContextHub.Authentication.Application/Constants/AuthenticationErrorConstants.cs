@@ -184,6 +184,7 @@ public static class AuthenticationErrorConstants
     /// Provides safe internal context for an optimistic concurrency conflict.
     /// </summary>
     public const string ENTITY_CHANGED = "The entity changed.";
+
     /// <summary>
     /// Describes invalid explicit credential expiration without publishing secret material.
     /// </summary>

@@ -26,7 +26,8 @@ public sealed class IdentityProvisioningService(
     /// <returns>The asynchronous provisioning operation.</returns>
     public async Task ProvisionAsync(CancellationToken cancellationToken)
     {
-        await unitOfWork.ExecuteInTransactionAsync(async token =>
+        await unitOfWork.ExecuteInTransactionAsync(
+            async token =>
         {
             // Account provisioning creates missing framework records; existing registrations stay unchanged.
             if (!await roleManager.RoleExistsAsync(AuthenticationConstants.OWNER))
@@ -135,7 +136,8 @@ public sealed class IdentityProvisioningService(
                     },
                     token);
             }
-        }, cancellationToken);
+        },
+            cancellationToken);
     }
 
     /// <summary>

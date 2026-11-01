@@ -11,7 +11,9 @@ public sealed class OpenApiOperationAttribute : Attribute
     /// </summary>
     /// <param name="successStatus">The actual success status.</param>
     /// <param name="errorStatuses">The endpoint-specific business failures; empty replaces shared failures.</param>
-    public OpenApiOperationAttribute(int successStatus, params int[] errorStatuses)
+    public OpenApiOperationAttribute(
+        int successStatus,
+        params int[] errorStatuses)
     {
         ArgumentNullException.ThrowIfNull(errorStatuses);
 

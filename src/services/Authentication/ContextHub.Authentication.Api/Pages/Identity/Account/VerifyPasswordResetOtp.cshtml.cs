@@ -57,11 +57,12 @@ public sealed class VerifyPasswordResetOtpModel(IMediator mediator) : SsoPageMod
 
         // This allowlist deliberately contains no Owner role, scope or full-login cookie material.
         var identity = new ClaimsIdentity(
-        [
+            [
             new Claim(ClaimTypes.NameIdentifier, grant.UserId.ToString()),
             new Claim(AuthenticationConstants.ACTOR_TYPE, AuthenticationRecoveryConstants.RECOVERY_ACTOR),
             new Claim(AuthenticationRecoveryConstants.RESET_TOKEN_CLAIM, grant.Token)
-        ], AuthenticationRecoveryConstants.RECOVERY_SCHEME);
+        ],
+            AuthenticationRecoveryConstants.RECOVERY_SCHEME);
         await HttpContext.SignInAsync(AuthenticationRecoveryConstants.RECOVERY_SCHEME, new ClaimsPrincipal(identity));
 
         return RedirectToPage(SsoPageConstants.RESET_PAGE, new { ReturnUrl });

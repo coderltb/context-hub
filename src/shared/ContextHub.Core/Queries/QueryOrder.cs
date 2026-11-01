@@ -28,7 +28,9 @@ public sealed class QueryOrder<TEntity>
     /// <param name="selector">The required ordering key expression.</param>
     /// <param name="descending">Whether the first key sorts descending.</param>
     /// <returns>A new ordering plan; no database work is performed.</returns>
-    public static QueryOrder<TEntity> By<TKey>(Expression<Func<TEntity, TKey>> selector, bool descending = false)
+    public static QueryOrder<TEntity> By<TKey>(
+        Expression<Func<TEntity, TKey>> selector,
+        bool descending = false)
     {
         ArgumentNullException.ThrowIfNull(selector);
 
@@ -44,7 +46,9 @@ public sealed class QueryOrder<TEntity>
     /// <param name="selector">The required provider-translatable tie-breaker.</param>
     /// <param name="descending">Whether this additional key sorts descending.</param>
     /// <returns>A new ordering that includes all previous keys and the additional key.</returns>
-    public QueryOrder<TEntity> ThenBy<TKey>(Expression<Func<TEntity, TKey>> selector, bool descending = false)
+    public QueryOrder<TEntity> ThenBy<TKey>(
+        Expression<Func<TEntity, TKey>> selector,
+        bool descending = false)
     {
         ArgumentNullException.ThrowIfNull(selector);
 

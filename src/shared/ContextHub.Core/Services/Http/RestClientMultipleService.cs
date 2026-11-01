@@ -88,7 +88,10 @@ public sealed class RestClientMultipleService(
     /// <param name="method">The HTTP verb used to dispatch this request.</param>
     /// <param name="cancellationToken">Cancellation propagated to the underlying operation.</param>
     /// <returns>The actual unread upstream response; the receiving caller must consume and dispose it.</returns>
-    private async Task<HttpResponseMessage> SendRequestAsync(BaseHttpRequest dto, HttpMethod method, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> SendRequestAsync(
+        BaseHttpRequest dto,
+        HttpMethod method,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(dto);
         ArgumentException.ThrowIfNullOrWhiteSpace(dto.HttpClientName);
@@ -133,7 +136,9 @@ public sealed class RestClientMultipleService(
     /// </summary>
     /// <param name="request">The locally owned request that releases attached content on every exit.</param>
     /// <param name="dto">The transport fields, media type and optional upload.</param>
-    private static void SetRequestContent(HttpRequestMessage request, BaseHttpRequest dto)
+    private static void SetRequestContent(
+        HttpRequestMessage request,
+        BaseHttpRequest dto)
     {
         // Native content selects form encoding and owns its multipart boundary.
         MediaTypeHeaderValue.TryParse(dto.ContentType, out var contentType);
@@ -144,7 +149,10 @@ public sealed class RestClientMultipleService(
             return;
         }
 
-        if (string.Equals(contentType?.MediaType, SharedConstants.HttpVariables.MULTIPART, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(
+            contentType?.MediaType,
+            SharedConstants.HttpVariables.MULTIPART,
+            StringComparison.OrdinalIgnoreCase))
         {
             var multipart = new MultipartFormDataContent();
             request.Content = multipart;
@@ -175,7 +183,9 @@ public sealed class RestClientMultipleService(
     /// <param name="uri">The endpoint before query fields are appended.</param>
     /// <param name="fields">Query fields whose names and values are URI-escaped without mutating the input.</param>
     /// <returns>The endpoint with escaped query fields before its original fragment.</returns>
-    private static string AppendQuery(string uri, IReadOnlyDictionary<string, string>? fields)
+    private static string AppendQuery(
+        string uri,
+        IReadOnlyDictionary<string, string>? fields)
     {
         if (fields is not { Count: > 0 })
         {
@@ -190,7 +200,9 @@ public sealed class RestClientMultipleService(
         {
             separator = address.Contains('?') ? "&" : "?";
         }
-        var query = string.Join("&", fields.Select(field => $"{Uri.EscapeDataString(field.Key)}={Uri.EscapeDataString(field.Value)}"));
+        var query = string.Join(
+            "&",
+            fields.Select(field => $"{Uri.EscapeDataString(field.Key)}={Uri.EscapeDataString(field.Value)}"));
 
         return address + separator + query + fragment;
     }

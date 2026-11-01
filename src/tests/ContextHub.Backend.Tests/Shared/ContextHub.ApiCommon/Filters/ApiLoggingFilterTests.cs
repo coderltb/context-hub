@@ -6,6 +6,39 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.ApiCommon.Filters;
 public sealed class ApiLoggingFilterTests
 {
     /// <summary>
+    /// Explicit metadata-only endpoints never evaluate private DTO getters in either diagnostic phase.
+    /// </summary>
+    /// <param name="resultStage">Whether the response rather than request is observed.</param>
+    /// <returns>The untouched payload and omission diagnostic.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MetadataOnlyEndpointDoesNotInspectPayload(bool resultStage)
+    {
+        using var fixture = new FilterFixture();
+        var payload = new ThrowingGetterPayload();
+        if (resultStage)
+        {
+            var context = CreateResultContext(payload);
+            context.ActionDescriptor.EndpointMetadata = [new ApiMetadataOnlyLoggingAttribute()];
+            await fixture.Filter.OnResultExecutionAsync(context,
+                () => Task.FromResult(new ResultExecutedContext(context, [], context.Result, context.Controller)));
+        }
+        else
+        {
+            var context = CreateActionContext(new Dictionary<string, object?> { ["request"] = payload });
+            context.ActionDescriptor.EndpointMetadata = [new ApiMetadataOnlyLoggingAttribute()];
+            await fixture.Filter.OnActionExecutionAsync(context,
+                () => Task.FromResult(new ActionExecutedContext(context, [], context.Controller)));
+        }
+
+        Assert.Equal(0, payload.ReadCount);
+        var entry = Assert.Single(fixture.Logs.Entries);
+        Assert.Contains(ApiCommonConstants.Logging.METADATA_ONLY, entry.Message);
+        Assert.DoesNotContain("private-getter-detail", entry.Message);
+    }
+
+    /// <summary>
     /// Logs only request-bound DTO values and leaves framework objects, services, transport bodies and request state alone.
     /// </summary>
     /// <returns>The argument-selection and ownership assertions.</returns>

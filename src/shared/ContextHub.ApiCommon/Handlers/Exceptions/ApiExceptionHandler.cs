@@ -42,15 +42,17 @@ public sealed class ApiExceptionHandler(
             BusinessException => StatusCodes.Status400BadRequest,
             ApiException api => api.StatusCode,
             BadHttpRequestException request when request.StatusCode.IsSupportedApiError() => request.StatusCode,
-            DistributedLockUnavailableException => StatusCodes.Status503ServiceUnavailable,
+            DistributedLockUnavailableException or DependencyUnavailableException => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status500InternalServerError
         };
 
         if (exception is CoreValidationException validation)
         {
             // Field names and messages may describe submitted data; global handling retains only a diagnostic count.
-            logger.LogWarning(ApiCommonLogConstants.ExceptionLogs.VALIDATION_REJECTED,
-                httpContext.TraceIdentifier, validation.Errors.Select(error => error.Field).Distinct().Count());
+            logger.LogWarning(
+                ApiCommonLogConstants.ExceptionLogs.VALIDATION_REJECTED,
+                httpContext.TraceIdentifier,
+                validation.Errors.Select(error => error.Field).Distinct().Count());
         }
         else if (exception is BusinessException or ApiException or BadHttpRequestException)
         {
@@ -64,20 +66,30 @@ public sealed class ApiExceptionHandler(
             // Keep declared identifiers internal. Never render Message, PublicMessage, InnerException or exception Data.
             if (status >= StatusCodes.Status500InternalServerError)
             {
-                logger.LogError(ApiCommonLogConstants.ExceptionLogs.EXPECTED_FAILURE,
-                    exception.GetType().Name, status, diagnosticCode, httpContext.TraceIdentifier);
+                logger.LogError(
+                    ApiCommonLogConstants.ExceptionLogs.EXPECTED_FAILURE,
+                    exception.GetType().Name,
+                    status,
+                    diagnosticCode,
+                    httpContext.TraceIdentifier);
             }
             else
             {
-                logger.LogWarning(ApiCommonLogConstants.ExceptionLogs.EXPECTED_FAILURE,
-                    exception.GetType().Name, status, diagnosticCode, httpContext.TraceIdentifier);
+                logger.LogWarning(
+                    ApiCommonLogConstants.ExceptionLogs.EXPECTED_FAILURE,
+                    exception.GetType().Name,
+                    status,
+                    diagnosticCode,
+                    httpContext.TraceIdentifier);
             }
         }
         else if (exception is not (CoreAuthenticationException or CoreAuthorizationException or DistributedLockUnavailableException))
         {
             // Authentication, policy and lock boundaries own their diagnostics; unexpected failures are recorded once here.
-            logger.LogError(ApiCommonLogConstants.ExceptionLogs.UNEXPECTED_FAILURE,
-                exception.GetType().Name, httpContext.TraceIdentifier);
+            logger.LogError(
+                ApiCommonLogConstants.ExceptionLogs.UNEXPECTED_FAILURE,
+                exception.GetType().Name,
+                httpContext.TraceIdentifier);
         }
 
         // One standard factory owns every global error body. Exception descriptions never override this security boundary.

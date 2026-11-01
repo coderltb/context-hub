@@ -72,8 +72,7 @@ public static class CoreServiceRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Profiles are pure, public and parameterless. Feature assemblies must already be loaded.
-        // Complete registration before the first Adapt or projection; never mutate global mappings per request.
+        // Scan loaded, parameterless profiles before first use; never change global mappings during requests.
         var config = TypeAdapterConfig.GlobalSettings;
         config.Scan(AppDomain.CurrentDomain.GetAssemblies());
         config.Compile();
@@ -195,8 +194,7 @@ public static class CoreServiceRegistration
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentException.ThrowIfNullOrWhiteSpace(sectionName);
 
-        // Missing required configuration must not silently become a default settings object.
-        // The owning service supplies safe validation messages; never embed option values or secrets in them.
+        // Reject missing configuration with safe service-owned messages that never contain option values.
         var section = configuration.GetRequiredSection(sectionName);
 
         return services.AddOptions<TOptions>().Bind(section).ValidateOnStart();

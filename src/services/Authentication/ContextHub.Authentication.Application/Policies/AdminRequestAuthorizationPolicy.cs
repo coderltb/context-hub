@@ -14,7 +14,9 @@ public sealed class AdminRequestAuthorizationPolicy<TRequest>(IAuthService authS
     /// <param name="request">The use case being authorized.</param>
     /// <param name="cancellationToken">Cancels request dispatch.</param>
     /// <returns>Whether the validated human principal satisfies the administration requirements.</returns>
-    public ValueTask<bool> IsAllowedAsync(TRequest request, CancellationToken cancellationToken)
+    public ValueTask<bool> IsAllowedAsync(
+        TRequest request,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

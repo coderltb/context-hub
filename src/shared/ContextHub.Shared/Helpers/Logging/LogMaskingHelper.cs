@@ -23,21 +23,24 @@ public static class LogMaskingHelper
     private static readonly Regex NamedValuePattern = new(
         "(?<![\\w-])(?<keyQuote>[\"']?)(?<key>" + string.Join("|", SensitiveNames.Select(name => string.Join("[-_]?", name.ToCharArray()))) +
         ")\\k<keyQuote>(?<separator>\\s*[:=]\\s*)(?:\"(?<doubleQuoted>(?:\\\\(?:.|\\z)|[^\"\\\\])*)(?:\"|\\z)|'(?<singleQuoted>(?:\\\\(?:.|\\z)|[^'\\\\])*)(?:'|\\z)|(?<value>(?:(?:Bearer|Basic)[ \\t]+)?[^&#;,\\s}\\]\"']+))",
-        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
+        TimeSpan.FromMilliseconds(100));
 
     /// <summary>
     /// Locates query pairs while leaving their original key encoding and unrelated URI components intact.
     /// </summary>
     private static readonly Regex QueryValuePattern = new(
         """(?<prefix>[?&])(?<key>[^?&#=\s"'<>]+)(?<separator>=)(?:"(?<doubleQuoted>(?:\\(?:.|\z)|[^"\\])*)(?:"|\z)|'(?<singleQuoted>(?:\\(?:.|\z)|[^'\\])*)(?:'|\z)|(?<value>[^&#\s"'<>]*))""",
-        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking,
+        TimeSpan.FromMilliseconds(100));
 
     /// <summary>
     /// Locates URI authority credentials without matching email addresses or at-signs in paths.
     /// </summary>
     private static readonly Regex UserInfoPattern = new(
         """(?<scheme>[a-z][a-z0-9+.-]*://)[^\s/?#"'<>@]+@""",
-        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.NonBacktracking,
+        TimeSpan.FromMilliseconds(100));
 
     /// <summary>
     /// Masks credential fields in JSON, embedded JSON strings and named text values while retaining ordinary content.
@@ -49,6 +52,20 @@ public static class LogMaskingHelper
         ArgumentNullException.ThrowIfNull(input);
 
         return MaskText(input, 0);
+    }
+
+    /// <summary>
+    /// Detects changed credential values or uninspectable content through the same bounded redaction pipeline.
+    /// </summary>
+    /// <param name="input">The source text to inspect without logging or modifying it.</param>
+    /// <returns>Whether credentials were redacted or inspection failed closed; JSON formatting alone is ignored.</returns>
+    public static bool ContainsSensitiveData(string input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var sensitive = false;
+        MaskText(input, 0, () => sensitive = true);
+        return sensitive;
     }
 
     /// <summary>
@@ -72,7 +89,9 @@ public static class LogMaskingHelper
     /// <param name="json">Explicitly selected diagnostic JSON, never arbitrary MCP arguments.</param>
     /// <param name="maxBytes">The UTF-8 inspection budget, bounded by the shared hard limit.</param>
     /// <returns>Redacted JSON, or only a mask for plain text, malformed, scalar or oversized input.</returns>
-    public static string RedactJson(string json, int maxBytes = SharedConstants.LoggingVariables.MAX_JSON_BYTES)
+    public static string RedactJson(
+        string json,
+        int maxBytes = SharedConstants.LoggingVariables.MAX_JSON_BYTES)
     {
         ArgumentNullException.ThrowIfNull(json);
 
@@ -89,7 +108,9 @@ public static class LogMaskingHelper
 
         try
         {
-            var node = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions
+            var node = JsonNode.Parse(
+                json,
+                documentOptions: new JsonDocumentOptions
             {
                 MaxDepth = SharedConstants.LoggingVariables.MAX_JSON_DEPTH
             });
@@ -106,8 +127,7 @@ public static class LogMaskingHelper
         }
         catch (Exception failure) when (failure is JsonException or ArgumentException)
         {
-            // Native DOM materialization rejects duplicate keys with ArgumentException, not JsonException.
-            // Both cases leave the diagnostic object uninspectable; never echo its original credentials.
+            // Duplicate-key DOM failures use ArgumentException; neither uninspectable JSON failure may expose credentials.
             return SharedConstants.LoggingVariables.MASKED_VALUE;
         }
     }
@@ -117,7 +137,11 @@ public static class LogMaskingHelper
     /// </summary>
     /// <param name="node">The private diagnostic DOM, not the caller's original request or response.</param>
     /// <param name="depth">The nesting count, including JSON carried inside string values.</param>
-    private static void RedactNode(JsonNode? node, int depth)
+    /// <param name="onRedaction">An optional observer for changed credential values and fail-closed inspection.</param>
+    private static void RedactNode(
+        JsonNode? node,
+        int depth,
+        Action? onRedaction = null)
     {
         if (node is JsonObject obj)
         {
@@ -126,11 +150,16 @@ public static class LogMaskingHelper
             {
                 if (IsSensitiveName(key))
                 {
+                    if (obj[key] is not JsonValue existing || !existing.TryGetValue<string>(out var text) ||
+                        text != SharedConstants.LoggingVariables.MASKED_VALUE)
+                    {
+                        onRedaction?.Invoke();
+                    }
                     obj[key] = SharedConstants.LoggingVariables.MASKED_VALUE;
                 }
                 else
                 {
-                    RedactNode(obj[key], depth + 1);
+                    RedactNode(obj[key], depth + 1, onRedaction);
                 }
             }
         }
@@ -139,13 +168,13 @@ public static class LogMaskingHelper
             // String redaction replaces array entries; index traversal remains valid while those values change.
             for (var index = 0; index < array.Count; index++)
             {
-                RedactNode(array[index], depth + 1);
+                RedactNode(array[index], depth + 1, onRedaction);
             }
         }
         else if (node is JsonValue value && value.TryGetValue<string>(out var text))
         {
             // DTO Content can itself be serialized JSON; inspect its credentials without masking the entire field.
-            value.ReplaceWith(JsonValue.Create(MaskText(text, depth + 1)));
+            value.ReplaceWith(JsonValue.Create(MaskText(text, depth + 1, onRedaction)));
         }
     }
 
@@ -154,11 +183,16 @@ public static class LogMaskingHelper
     /// </summary>
     /// <param name="input">The independently owned text being inspected.</param>
     /// <param name="depth">The nesting count across object and encoded-string boundaries.</param>
+    /// <param name="onRedaction">An optional observer for changed credential values and fail-closed inspection.</param>
     /// <returns>The credential-masked text, never a mutated caller object.</returns>
-    private static string MaskText(string input, int depth)
+    private static string MaskText(
+        string input,
+        int depth,
+        Action? onRedaction = null)
     {
         if (depth >= SharedConstants.LoggingVariables.MAX_JSON_DEPTH)
         {
+            onRedaction?.Invoke();
             return SharedConstants.LoggingVariables.MASKED_VALUE;
         }
 
@@ -167,26 +201,28 @@ public static class LogMaskingHelper
             try
             {
                 // Decode a complete native JSON string before inspecting its content; repeated encodings share the depth limit.
-                using var document = JsonDocument.Parse(input, new JsonDocumentOptions
+                using var document = JsonDocument.Parse(
+                    input,
+                    new JsonDocumentOptions
                 {
                     MaxDepth = SharedConstants.LoggingVariables.MAX_JSON_DEPTH
                 });
                 if (document.RootElement.ValueKind == JsonValueKind.String)
                 {
-                    return JsonSerializer.Serialize(MaskText(document.RootElement.GetString()!, depth + 1));
+                    return JsonSerializer.Serialize(MaskText(document.RootElement.GetString()!, depth + 1, onRedaction));
                 }
             }
             catch (JsonException)
             {
                 // A leading quote can also belong to mixed diagnostic text; its fragments and named values still need inspection.
-                return MaskJsonFragments(input, depth);
+                return MaskJsonFragments(input, depth, onRedaction);
             }
         }
 
         // Ordinary text needs no JSON allocation. Mixed text uses the native reader to delimit each complete value.
         return input.AsSpan().IndexOfAny('{', '[', '"') < 0
-            ? MaskNamedValues(input)
-            : MaskJsonFragments(input, depth);
+            ? MaskNamedValues(input, onRedaction)
+            : MaskJsonFragments(input, depth, onRedaction);
     }
 
     /// <summary>
@@ -194,8 +230,12 @@ public static class LogMaskingHelper
     /// </summary>
     /// <param name="input">The mixed text being copied and inspected.</param>
     /// <param name="depth">The nesting count across encoded JSON string values.</param>
+    /// <param name="onRedaction">An optional observer for changed credential values and fail-closed inspection.</param>
     /// <returns>Text with inspected JSON fragments and independently masked surrounding text.</returns>
-    private static string MaskJsonFragments(string input, int depth)
+    private static string MaskJsonFragments(
+        string input,
+        int depth,
+        Action? onRedaction = null)
     {
         // Encode once: parsing each remaining substring separately would repeatedly copy large provider responses.
         var utf8 = Encoding.UTF8.GetBytes(input);
@@ -214,7 +254,9 @@ public static class LogMaskingHelper
 
             try
             {
-                var reader = new Utf8JsonReader(utf8.AsSpan(index), new JsonReaderOptions
+                var reader = new Utf8JsonReader(
+                    utf8.AsSpan(index),
+                    new JsonReaderOptions
                 {
                     MaxDepth = SharedConstants.LoggingVariables.MAX_JSON_DEPTH
                 });
@@ -235,7 +277,7 @@ public static class LogMaskingHelper
                     if (HasSensitiveQuotedParent(surrounding, valueStart))
                     {
                         // A sensitive parent owns the whole value. Flush it now so repeated encoded values do not rescan a growing prefix.
-                        output.Append(MaskNamedValues(surrounding));
+                        output.Append(MaskNamedValues(surrounding, onRedaction));
                         index += candidateLength;
                         unwritten = index;
                         continue;
@@ -245,14 +287,14 @@ public static class LogMaskingHelper
                 if (quoted)
                 {
                     // A root JsonValue has no parent for ReplaceWith; retain the redacted replacement explicitly.
-                    node = JsonValue.Create(MaskText(node.GetValue<string>(), depth + 1));
+                    node = JsonValue.Create(MaskText(node.GetValue<string>(), depth + 1, onRedaction));
                 }
                 else
                 {
-                    RedactNode(node, depth);
+                    RedactNode(node, depth, onRedaction);
                 }
 
-                output.Append(MaskNamedValues(Encoding.UTF8.GetString(utf8.AsSpan(unwritten, index - unwritten))));
+                output.Append(MaskNamedValues(Encoding.UTF8.GetString(utf8.AsSpan(unwritten, index - unwritten)), onRedaction));
                 output.Append(node.ToJsonString());
 
                 // Skip the complete native value, including braces inside quoted strings; plain suffix text remains separate.
@@ -276,7 +318,8 @@ public static class LogMaskingHelper
                 }
 
                 // Malformed syntax and duplicate DOM keys are uninspectable. Drop the remainder instead of echoing credentials.
-                output.Append(MaskNamedValues(Encoding.UTF8.GetString(utf8.AsSpan(unwritten, index - unwritten))));
+                output.Append(MaskNamedValues(Encoding.UTF8.GetString(utf8.AsSpan(unwritten, index - unwritten)), onRedaction));
+                onRedaction?.Invoke();
                 output.Append(SharedConstants.LoggingVariables.MASKED_VALUE);
 
                 return output.ToString();
@@ -286,10 +329,10 @@ public static class LogMaskingHelper
         // Keep non-JSON text in its original representation, including ordinary placeholders and location fields.
         if (unwritten == 0)
         {
-            return MaskNamedValues(input);
+            return MaskNamedValues(input, onRedaction);
         }
 
-        output.Append(MaskNamedValues(Encoding.UTF8.GetString(utf8.AsSpan(unwritten))));
+        output.Append(MaskNamedValues(Encoding.UTF8.GetString(utf8.AsSpan(unwritten)), onRedaction));
 
         return output.ToString();
     }
@@ -300,7 +343,9 @@ public static class LogMaskingHelper
     /// <param name="input">The unwritten text ending at the complete quoted value.</param>
     /// <param name="valueStart">The character offset of the value's opening quote.</param>
     /// <returns>Whether an existing sensitive named or query pair owns this exact quoted value.</returns>
-    private static bool HasSensitiveQuotedParent(string input, int valueStart)
+    private static bool HasSensitiveQuotedParent(
+        string input,
+        int valueStart)
     {
         if (NamedValuePattern.Matches(input).Any(match => match.Groups["doubleQuoted"].Success &&
                 match.Groups["doubleQuoted"].Index == valueStart + 1))
@@ -344,15 +389,29 @@ public static class LogMaskingHelper
     /// Masks named text credentials with the same sensitive-name authority and bounded regular expression.
     /// </summary>
     /// <param name="input">Text outside an already inspected JSON fragment.</param>
+    /// <param name="onRedaction">An optional observer for changed credential values and fail-closed inspection.</param>
     /// <returns>Text with only recognized credential values replaced, or a mask if inspection times out.</returns>
-    private static string MaskNamedValues(string input)
+    private static string MaskNamedValues(
+        string input,
+        Action? onRedaction = null)
     {
         try
         {
             // URI user-info is an authentication component even when its username alone carries a token.
-            input = UserInfoPattern.Replace(input, match =>
-                match.Groups["scheme"].Value + SharedConstants.LoggingVariables.MASKED_VALUE + "@");
-            input = QueryValuePattern.Replace(input, match =>
+            input = UserInfoPattern.Replace(
+                input,
+                match =>
+            {
+                var replacement = match.Groups["scheme"].Value + SharedConstants.LoggingVariables.MASKED_VALUE + "@";
+                if (replacement != match.Value)
+                {
+                    onRedaction?.Invoke();
+                }
+                return replacement;
+            });
+            input = QueryValuePattern.Replace(
+                input,
+                match =>
             {
                 // Decode the name exactly once, never the full URI or value; double-encoded names retain their literal meaning.
                 if (!IsSensitiveName(WebUtility.UrlDecode(match.Groups["key"].Value)))
@@ -362,11 +421,18 @@ public static class LogMaskingHelper
 
                 var quote = GetCredentialQuote(match);
 
-                return match.Groups["prefix"].Value + match.Groups["key"].Value + match.Groups["separator"].Value +
-                       quote + SharedConstants.LoggingVariables.MASKED_VALUE + quote;
+                var replacement = match.Groups["prefix"].Value + match.Groups["key"].Value + match.Groups["separator"].Value +
+                    quote + SharedConstants.LoggingVariables.MASKED_VALUE + quote;
+                if (replacement != match.Value)
+                {
+                    onRedaction?.Invoke();
+                }
+                return replacement;
             });
 
-            return NamedValuePattern.Replace(input, match =>
+            return NamedValuePattern.Replace(
+                input,
+                match =>
             {
                 if (!IsSensitiveName(match.Groups["key"].Value))
                 {
@@ -378,13 +444,19 @@ public static class LogMaskingHelper
 
                 var keyQuote = match.Groups["keyQuote"].Value;
 
-                return keyQuote + match.Groups["key"].Value + keyQuote + match.Groups["separator"].Value + quote +
-                       SharedConstants.LoggingVariables.MASKED_VALUE + quote;
+                var replacement = keyQuote + match.Groups["key"].Value + keyQuote + match.Groups["separator"].Value + quote +
+                    SharedConstants.LoggingVariables.MASKED_VALUE + quote;
+                if (replacement != match.Value)
+                {
+                    onRedaction?.Invoke();
+                }
+                return replacement;
             });
         }
         catch (RegexMatchTimeoutException)
         {
             // Do not return uninspected credentials if an unusually complex input exceeds the matching timeout.
+            onRedaction?.Invoke();
             return SharedConstants.LoggingVariables.MASKED_VALUE;
         }
     }

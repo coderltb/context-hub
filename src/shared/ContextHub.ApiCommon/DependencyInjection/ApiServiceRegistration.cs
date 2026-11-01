@@ -12,7 +12,10 @@ public static class ApiServiceRegistration
     /// <param name="routePrefix">The complete non-root route prefix owned by this host.</param>
     /// <param name="apiVersion">The public response metadata version.</param>
     /// <returns>The same container for composition at the host.</returns>
-    public static IServiceCollection AddApiInfrastructure(this IServiceCollection services, string routePrefix, string apiVersion)
+    public static IServiceCollection AddApiInfrastructure(
+        this IServiceCollection services,
+        string routePrefix,
+        string apiVersion)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -107,7 +110,9 @@ public static class ApiServiceRegistration
     /// <param name="services">The host service collection.</param>
     /// <param name="configure">Optional normalized subject mapping.</param>
     /// <returns>The same service collection.</returns>
-    public static IServiceCollection AddHttpAudit(this IServiceCollection services, Action<CurrentUserOptions>? configure = null)
+    public static IServiceCollection AddHttpAudit(
+        this IServiceCollection services,
+        Action<CurrentUserOptions>? configure = null)
     {
         // Reuse the selected authenticated principal as the audit actor; feature bodies cannot supply their own actor identifier.
         services.AddCurrentUser(configure);
@@ -123,7 +128,9 @@ public static class ApiServiceRegistration
     /// <param name="services">The host service collection.</param>
     /// <param name="configure">Optional subject claim mapping, after token validation.</param>
     /// <returns>The same service collection.</returns>
-    public static IServiceCollection AddCurrentUser(this IServiceCollection services, Action<CurrentUserOptions>? configure = null)
+    public static IServiceCollection AddCurrentUser(
+        this IServiceCollection services,
+        Action<CurrentUserOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -134,7 +141,8 @@ public static class ApiServiceRegistration
             options.Configure(configure);
         }
 
-        options.Validate(value => !string.IsNullOrWhiteSpace(value.SubjectClaimType),
+        options.Validate(
+            value => !string.IsNullOrWhiteSpace(value.SubjectClaimType),
             CoreErrorConstants.AuthenticationErrors.SUBJECT_CLAIM_REQUIRED).ValidateOnStart();
         services.TryAddScoped<IAuthService, AuthService>();
 
@@ -151,8 +159,7 @@ public static class ApiServiceRegistration
         ArgumentNullException.ThrowIfNull(services);
 
         // Dependency outages must not restart a healthy process. Self is intentionally not tagged ready.
-        return services.AddHealthChecks().AddCheck(HealthConstants.SELF,
-            () => HealthCheckResult.Healthy(), tags: [HealthConstants.LIVENESS_TAG]);
+        return services.AddHealthChecks().AddCheck(HealthConstants.SELF, () => HealthCheckResult.Healthy(), tags: [HealthConstants.LIVENESS_TAG]);
     }
 
     /// <summary>
@@ -164,8 +171,7 @@ public static class ApiServiceRegistration
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        // The transformer is stateless. Native options resolve it from this host's container,
-        // so registration never constructs a second service provider or changes another host.
+        // Native options resolve the stateless transformer from this host without creating another provider.
         builder.Services.TryAddSingleton<SlugifyTransformer>();
         builder.Services.AddOptions<MvcOptions>().Configure<SlugifyTransformer>((options, transformer) =>
             options.Conventions.Add(new RouteTokenTransformerConvention(transformer)));

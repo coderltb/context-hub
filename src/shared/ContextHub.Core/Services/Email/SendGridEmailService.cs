@@ -17,7 +17,9 @@ public sealed class SendGridEmailService(
     /// <param name="request">The message, which may contain transient proof and must not be logged.</param>
     /// <param name="cancellationToken">Cancels the SDK send.</param>
     /// <returns>True only when the provider accepted the message; this does not confirm delivery.</returns>
-    public async Task<bool> SendAsync(EmailRequestDto request, CancellationToken cancellationToken)
+    public async Task<bool> SendAsync(
+        EmailRequestDto request,
+        CancellationToken cancellationToken)
     {
         var message = MailHelper.CreateSingleEmail(
             new EmailAddress(sendGridOptions.Value.FromEmail, sendGridOptions.Value.FromName),
@@ -31,17 +33,13 @@ public sealed class SendGridEmailService(
         {
             response = await sendGridClient.SendEmailAsync(message, cancellationToken);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (
+            exception is OperationCanceledException && !cancellationToken.IsCancellationRequested ||
+            exception is HttpRequestException or TimeoutRejectedException or BrokenCircuitException)
         {
-            // SDK timeout is an unsuccessful delivery attempt; explicit caller cancellation must still propagate.
-            logger.LogWarning(CoreLogConstants.EmailLogs.TRANSPORT_FAILED, nameof(TimeoutException));
-
-            return false;
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TimeoutRejectedException or BrokenCircuitException)
-        {
-            // Expected transport failures cannot confirm acceptance; keep details private and do not retry here.
-            logger.LogWarning(CoreLogConstants.EmailLogs.TRANSPORT_FAILED, exception.GetType().Name);
+            // Only known transport failures use fallback; caller cancellation and programming errors propagate.
+            var failureType = exception is OperationCanceledException ? nameof(TimeoutException) : exception.GetType().Name;
+            logger.LogWarning(CoreLogConstants.EmailLogs.TRANSPORT_FAILED, failureType);
 
             return false;
         }

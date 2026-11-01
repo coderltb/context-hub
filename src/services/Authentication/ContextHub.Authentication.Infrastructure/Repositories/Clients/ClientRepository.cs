@@ -36,9 +36,7 @@ public class ClientRepository(
         Guid clientId,
         CancellationToken cancellationToken)
     {
-        var client = await FirstOrDefaultAsync<ClientResponseDto>(
-            predicate: value => value.Id == clientId,
-            cancellationToken: cancellationToken);
+        var client = await FirstOrDefaultAsync<ClientResponseDto>(predicate: value => value.Id == clientId, cancellationToken: cancellationToken);
 
         if (client is null)
         {
@@ -113,7 +111,9 @@ public class ClientRepository(
     /// <param name="client">The approved state and opaque expected version.</param>
     /// <param name="cancellationToken">Cancels the save.</param>
     /// <returns>The saved projection with its refreshed concurrency value.</returns>
-    public virtual async Task<ClientResponseDto> UpdateAsync(ClientModel client, CancellationToken cancellationToken)
+    public virtual async Task<ClientResponseDto> UpdateAsync(
+        ClientModel client,
+        CancellationToken cancellationToken)
     {
         var entity = client.Adapt<Client>();
         Update(entity);
@@ -131,10 +131,14 @@ public class ClientRepository(
             exception.Entries.Count == 1 && ReferenceEquals(exception.Entries[0].Entity, entity))
         {
             // Classify only an optimistic write conflict; provider/configuration errors retain their native failure path.
-            logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(UpdateAsync),
+            logger.LogWarning(
+                AuthenticationLogConstants.OPERATION_REJECTED,
+                nameof(UpdateAsync),
                 AuthenticationErrorConstants.CONCURRENCY_CONFLICT);
-            throw new BusinessException(AuthenticationErrorConstants.CONCURRENCY_CONFLICT,
-                AuthenticationErrorConstants.ENTITY_CHANGED, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                AuthenticationErrorConstants.CONCURRENCY_CONFLICT,
+                AuthenticationErrorConstants.ENTITY_CHANGED,
+                BusinessErrorKind.Conflict);
         }
 
         return entity.Adapt<ClientResponseDto>();
@@ -146,7 +150,9 @@ public class ClientRepository(
     /// <param name="token">The approved metadata and digest.</param>
     /// <param name="cancellationToken">Cancels staging and save.</param>
     /// <returns>The completed persistence operation.</returns>
-    public virtual async Task AddTokenAsync(ClientTokenModel token, CancellationToken cancellationToken)
+    public virtual async Task AddTokenAsync(
+        ClientTokenModel token,
+        CancellationToken cancellationToken)
     {
         await authenticationDbContext.ClientTokens.AddAsync(token.Adapt<ClientToken>(), cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -187,10 +193,14 @@ public class ClientRepository(
                 return committed.Adapt<ClientTokenResponseDto>();
             }
 
-            logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(UpdateTokenAsync),
+            logger.LogWarning(
+                AuthenticationLogConstants.OPERATION_REJECTED,
+                nameof(UpdateTokenAsync),
                 AuthenticationErrorConstants.CONCURRENCY_CONFLICT);
-            throw new BusinessException(AuthenticationErrorConstants.CONCURRENCY_CONFLICT,
-                AuthenticationErrorConstants.ENTITY_CHANGED, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                AuthenticationErrorConstants.CONCURRENCY_CONFLICT,
+                AuthenticationErrorConstants.ENTITY_CHANGED,
+                BusinessErrorKind.Conflict);
         }
 
         // Read database precision so the first response and later idempotent responses carry the same timestamp.

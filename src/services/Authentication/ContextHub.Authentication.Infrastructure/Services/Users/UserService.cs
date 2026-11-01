@@ -36,7 +36,9 @@ public sealed class UserService(
     /// <param name="id">The account identifier.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The approved projection, or null for Application to classify as unavailable.</returns>
-    public Task<UserResponseDto?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+    public Task<UserResponseDto?> GetAsync(
+        Guid id,
+        CancellationToken cancellationToken) =>
         userRepository.GetAsync(id, cancellationToken);
 
     /// <summary>
@@ -51,39 +53,47 @@ public sealed class UserService(
         ChangePasswordRequestDto request,
         CancellationToken cancellationToken)
     {
-        // Keep the native password update and human-grant revocation in one transaction: either both commit or neither does.
-        var profile = await unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
-            // Reload the active account and its current membership; a previously issued principal is not proof of current Owner access.
-            var user = await userRepository.FirstOrDefaultAsync(
-                predicate: value => value.Id == id && value.IsActive,
-                cancellationToken: token);
-            if (user is null || !await userManager.IsInRoleAsync(user, AuthenticationConstants.OWNER))
+        // Commit password change and grant revocation together.
+        var profile = await unitOfWork.ExecuteInTransactionAsync(
+            async token =>
             {
-                logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(ChangePasswordAsync),
-                    AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED);
-                throw new BusinessException(AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED,
-                    AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
-            }
+                // Recheck active Owner access inside the write transaction.
+                var user = await userRepository.FirstOrDefaultAsync(
+                    predicate: value => value.Id == id && value.IsActive,
+                    cancellationToken: token);
+                if (user is null || !await userManager.IsInRoleAsync(user, AuthenticationConstants.OWNER))
+                {
+                    logger.LogWarning(
+                        AuthenticationLogConstants.OPERATION_REJECTED,
+                        nameof(ChangePasswordAsync),
+                        AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED);
+                    throw new BusinessException(
+                        AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED,
+                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                }
 
-            // Identity checks the old password, enforces policy and updates the security stamp once.
-            var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
-            if (!result.Succeeded)
-            {
-                logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(ChangePasswordAsync),
-                    AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED);
-                throw new BusinessException(AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED,
-                    AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
-            }
+                // Identity checks the old password, enforces policy and updates the security stamp once.
+                var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+                if (!result.Succeeded)
+                {
+                    logger.LogWarning(
+                        AuthenticationLogConstants.OPERATION_REJECTED,
+                        nameof(ChangePasswordAsync),
+                        AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED);
+                    throw new BusinessException(
+                        AuthenticationErrorConstants.PASSWORD_CHANGE_REJECTED,
+                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                }
 
-            // Human grants are revoked in the same transaction; independently issued client tokens are untouched.
-            await sessionService.RevokeAllAsync(user.Id, token);
+                // Revoke human grants without changing independent client credentials.
+                await sessionService.RevokeAllAsync(user.Id, token);
 
-            // Project the approved account DTO after the native write, while the transaction still sees its own changes.
-            return (await userRepository.GetAsync(user.Id, token))!;
-        }, cancellationToken);
+                // Project the saved account within this transaction.
+                return (await userRepository.GetAsync(user.Id, token))!;
+            },
+            cancellationToken);
 
-        // Publish the security outcome only after commit; submitted passwords never belong in this event.
+        // Log the security outcome after commit without credential data.
         logger.LogInformation(AuthenticationLogConstants.PASSWORD_CHANGED);
 
         return profile;
@@ -101,52 +111,64 @@ public sealed class UserService(
     {
         try
         {
-            // Create the account and assign Owner membership atomically, including the saves performed by Identity managers.
-            return await unitOfWork.ExecuteInTransactionAsync(async token =>
-            {
-                // Serialize role-sensitive changes through the existing repository boundary.
-                await userRepository.LockOwnerMembershipAsync(token);
-
-                // Map only allowed profile fields; generate identity and lockout state on the server instead of copying request security state.
-                var user = request.Adapt<User>();
-                user.Id = Guid.CreateVersion7();
-                user.LockoutEnabled = true;
-
-                // Let Identity enforce password policy, normalize account fields and persist its credential state.
-                var created = await userManager.CreateAsync(user, request.Password);
-                if (!created.Succeeded)
+            // Keep Identity account and Owner-membership saves atomic.
+            return await unitOfWork.ExecuteInTransactionAsync(
+                async token =>
                 {
-                    // Separate an expected duplicate-email conflict from other native rejections without publishing framework descriptions.
-                    var duplicateEmail = created.Errors.Any(error => error.Code == AuthenticationInfrastructureConstants.NATIVE_DUPLICATE_EMAIL);
-                    var errorCode = duplicateEmail ? AuthenticationErrorConstants.ACCOUNT_EMAIL_CONFLICT
-                        : AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED;
-                    logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(CreateAsync), errorCode);
-                    throw new BusinessException(errorCode, AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED,
-                        duplicateEmail ? BusinessErrorKind.Conflict : BusinessErrorKind.Invalid);
-                }
+                    // Serialize role-sensitive changes through the existing repository boundary.
+                    await userRepository.LockOwnerMembershipAsync(token);
 
-                // The server assigns Owner; the request cannot choose roles or copy credential state.
-                var assigned = await userManager.AddToRoleAsync(user, AuthenticationConstants.OWNER);
-                if (!assigned.Succeeded)
-                {
-                    logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(CreateAsync),
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                    throw new BusinessException(AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
-                }
+                    // Map profile fields; identity and lockout state remain server-owned.
+                    var user = request.Adapt<User>();
+                    user.Id = Guid.CreateVersion7();
+                    user.LockoutEnabled = true;
 
-                // Return the repository projection rather than the Identity entity, so hashes and stamps remain inside Infrastructure.
-                return (await userRepository.GetAsync(user.Id, token))!;
-            }, cancellationToken);
+                    // Identity owns password policy, normalization and credential persistence.
+                    var created = await userManager.CreateAsync(user, request.Password);
+                    if (!created.Succeeded)
+                    {
+                        // Classify duplicate email without exposing native error descriptions.
+                        var duplicateEmail = created.Errors.Any(error =>
+                            error.Code == AuthenticationInfrastructureConstants.NATIVE_DUPLICATE_EMAIL);
+                        var errorCode = duplicateEmail ? AuthenticationErrorConstants.ACCOUNT_EMAIL_CONFLICT
+                            : AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED;
+                        logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(CreateAsync), errorCode);
+                        throw new BusinessException(
+                            errorCode,
+                            AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED,
+                            duplicateEmail ? BusinessErrorKind.Conflict : BusinessErrorKind.Invalid);
+                    }
+
+                    // The server assigns Owner; the request cannot choose roles or copy credential state.
+                    var assigned = await userManager.AddToRoleAsync(user, AuthenticationConstants.OWNER);
+                    if (!assigned.Succeeded)
+                    {
+                        logger.LogWarning(
+                            AuthenticationLogConstants.OPERATION_REJECTED,
+                            nameof(CreateAsync),
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                        throw new BusinessException(
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                            AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    }
+
+                    // Return the repository projection rather than the Identity entity, so hashes and stamps remain inside Infrastructure.
+                    return (await userRepository.GetAsync(user.Id, token))!;
+                },
+                cancellationToken);
         }
         catch (DbUpdateException exception) when (
             PostgreSqlExceptionHelper.GetUniqueConstraintName(exception) == AuthenticationInfrastructureConstants.UNIQUE_EMAIL_INDEX)
         {
             // Native validation handles normal duplicates; this translation covers the concurrent database uniqueness race.
-            logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(CreateAsync),
+            logger.LogWarning(
+                AuthenticationLogConstants.OPERATION_REJECTED,
+                nameof(CreateAsync),
                 AuthenticationErrorConstants.ACCOUNT_EMAIL_CONFLICT);
-            throw new BusinessException(AuthenticationErrorConstants.ACCOUNT_EMAIL_CONFLICT,
-                AuthenticationErrorConstants.ACCOUNT_POLICY_CONFLICT, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                AuthenticationErrorConstants.ACCOUNT_EMAIL_CONFLICT,
+                AuthenticationErrorConstants.ACCOUNT_POLICY_CONFLICT,
+                BusinessErrorKind.Conflict);
         }
     }
 
@@ -159,50 +181,52 @@ public sealed class UserService(
     public async Task<InvitedUserResponseDto> InviteAsync(
         InviteUserRequestDto request,
         CancellationToken cancellationToken) =>
-        await unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
-            // Hold the membership lock across role checks, passwordless creation and assignment; validation alone cannot protect concurrent mutations.
-            await userRepository.LockOwnerMembershipAsync(token);
-
-            // Check requested roles against the live native catalog, not the cached display metadata.
-            await ValidateRolesAsync(request.RoleNames);
-
-            // Mapping handles approved metadata; callers cannot supply the generated key or credential policy.
-            var user = request.Adapt<User>();
-            user.Id = Guid.CreateVersion7();
-            user.LockoutEnabled = true;
-
-            // Create a passwordless account explicitly; the separate invitation flow will bind its first password later.
-            var createResult = await userManager.CreateAsync(user);
-
-            if (!createResult.Succeeded)
+        await unitOfWork.ExecuteInTransactionAsync(
+            async token =>
             {
-                logger.LogWarning(
-                    AuthenticationLogConstants.OPERATION_REJECTED,
-                    nameof(InviteAsync),
-                    AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                throw new BusinessException(
-                    AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                    AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
-            }
+                // Keep role checks and passwordless account creation under the same membership lock.
+                await userRepository.LockOwnerMembershipAsync(token);
 
-            // Assign only validated role names before producing a usable invitation; any failure aborts the surrounding transaction.
-            var roleAssignmentResult = await userManager.AddToRolesAsync(user, request.RoleNames);
+                // Check requested roles against the live native catalog, not the cached display metadata.
+                await ValidateRolesAsync(request.RoleNames);
 
-            if (!roleAssignmentResult.Succeeded)
-            {
-                logger.LogWarning(
-                    AuthenticationLogConstants.OPERATION_REJECTED,
-                    nameof(InviteAsync),
-                    AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                throw new BusinessException(
-                    AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                    AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
-            }
+                // Mapping handles approved metadata; callers cannot supply the generated key or credential policy.
+                var user = request.Adapt<User>();
+                user.Id = Guid.CreateVersion7();
+                user.LockoutEnabled = true;
 
-            // Generate the native invitation only after account and membership writes have succeeded.
-            return await CreateInvitationAsync(user, token);
-        }, cancellationToken);
+                // Create a passwordless account explicitly; the separate invitation flow will bind its first password later.
+                var createResult = await userManager.CreateAsync(user);
+
+                if (!createResult.Succeeded)
+                {
+                    logger.LogWarning(
+                        AuthenticationLogConstants.OPERATION_REJECTED,
+                        nameof(InviteAsync),
+                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                    throw new BusinessException(
+                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                }
+
+                // Assign only validated role names before producing a usable invitation; any failure aborts the surrounding transaction.
+                var roleAssignmentResult = await userManager.AddToRolesAsync(user, request.RoleNames);
+
+                if (!roleAssignmentResult.Succeeded)
+                {
+                    logger.LogWarning(
+                        AuthenticationLogConstants.OPERATION_REJECTED,
+                        nameof(InviteAsync),
+                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                    throw new BusinessException(
+                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                }
+
+                // Generate the native invitation only after account and membership writes have succeeded.
+                return await CreateInvitationAsync(user, token);
+            },
+            cancellationToken);
 
     /// <summary>
     /// Changes status while serializing every operation that could remove the final active Owner.
@@ -215,58 +239,60 @@ public sealed class UserService(
         Guid id,
         UserStatusRequestDto request,
         CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
-            // Serialize membership-sensitive changes before checking the current version and final-Owner invariant.
-            await userRepository.LockOwnerMembershipAsync(token);
-            var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
-
-            // Protect the last active Owner only when this request would deactivate one; repeated no-op updates do not remove access again.
-            if (!request.IsActive && user.IsActive && await userManager.IsInRoleAsync(user, AuthenticationConstants.OWNER))
+        unitOfWork.ExecuteInTransactionAsync(
+            async token =>
             {
-                await EnsureAnotherOwnerAsync(id, token);
-            }
+                // Serialize membership-sensitive changes before checking the current version and final-Owner invariant.
+                await userRepository.LockOwnerMembershipAsync(token);
+                var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
 
-            // Write only a real state transition, keeping the stored concurrency version stable for a no-op request.
-            if (user.IsActive != request.IsActive)
-            {
-                user.IsActive = request.IsActive;
-
-                // Persist the active flag through Identity so its validation and optimistic concurrency checks remain authoritative.
-                var updateResult = await userManager.UpdateAsync(user);
-
-                if (!updateResult.Succeeded)
+                // Protect the last active Owner only when this request would deactivate one; repeated no-op updates do not remove access again.
+                if (!request.IsActive && user.IsActive && await userManager.IsInRoleAsync(user, AuthenticationConstants.OWNER))
                 {
-                    logger.LogWarning(
-                        AuthenticationLogConstants.OPERATION_REJECTED,
-                        nameof(SetStatusAsync),
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                    throw new BusinessException(
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    await EnsureAnotherOwnerAsync(id, token);
                 }
 
-                // Invalidate existing cookie validation state before committing the status change and human-token revocation.
-                var securityStampResult = await userManager.UpdateSecurityStampAsync(user);
-
-                if (!securityStampResult.Succeeded)
+                // Write only a real state transition, keeping the stored concurrency version stable for a no-op request.
+                if (user.IsActive != request.IsActive)
                 {
-                    logger.LogWarning(
-                        AuthenticationLogConstants.OPERATION_REJECTED,
-                        nameof(SetStatusAsync),
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                    throw new BusinessException(
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    user.IsActive = request.IsActive;
+
+                    // Persist the active flag through Identity so its validation and optimistic concurrency checks remain authoritative.
+                    var updateResult = await userManager.UpdateAsync(user);
+
+                    if (!updateResult.Succeeded)
+                    {
+                        logger.LogWarning(
+                            AuthenticationLogConstants.OPERATION_REJECTED,
+                            nameof(SetStatusAsync),
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                        throw new BusinessException(
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                            AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    }
+
+                    // Invalidate existing cookie validation state before committing the status change and human-token revocation.
+                    var securityStampResult = await userManager.UpdateSecurityStampAsync(user);
+
+                    if (!securityStampResult.Succeeded)
+                    {
+                        logger.LogWarning(
+                            AuthenticationLogConstants.OPERATION_REJECTED,
+                            nameof(SetStatusAsync),
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                        throw new BusinessException(
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                            AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    }
+
+                    // Previously issued human grants must not retain authority after account status changes.
+                    await sessionService.RevokeAllAsync(user.Id, token);
                 }
 
-                // Previously issued human grants must not retain authority after account status changes.
-                await sessionService.RevokeAllAsync(user.Id, token);
-            }
-
-            // Read the resulting administrative DTO in the same transaction, including a newly inactive account.
-            return (await userRepository.GetAsync(id, token))!;
-        }, cancellationToken);
+                // Read the saved profile in this transaction, including inactive state.
+                return (await userRepository.GetAsync(id, token))!;
+            },
+            cancellationToken);
 
     /// <summary>
     /// Replaces native memberships and invalidates old authorization state atomically.
@@ -279,72 +305,75 @@ public sealed class UserService(
         Guid id,
         UserRolesRequestDto request,
         CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
-            // Serialize role changes before reading the current version and membership set; the final-Owner check must stay inside this boundary.
-            await userRepository.LockOwnerMembershipAsync(token);
-            await ValidateRolesAsync(request.RoleNames);
-            var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
-            var current = await userManager.GetRolesAsync(user);
-
-            // Removing Owner from an active account requires another active Owner to remain.
-            if (user.IsActive && current.Contains(AuthenticationConstants.OWNER) && !request.RoleNames.Contains(AuthenticationConstants.OWNER))
+        unitOfWork.ExecuteInTransactionAsync(
+            async token =>
             {
-                await EnsureAnotherOwnerAsync(id, token);
-            }
+                // Keep the final-Owner check and membership changes inside the same locked transaction.
+                await userRepository.LockOwnerMembershipAsync(token);
+                await ValidateRolesAsync(request.RoleNames);
+                var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
+                var current = await userManager.GetRolesAsync(user);
 
-            // Compare membership as a set: changing input order alone must not invalidate sessions or rewrite the account.
-            if (!current.Order().SequenceEqual(request.RoleNames.Order()))
-            {
-                // Apply only the removed membership delta; unaffected roles stay in place.
-                var roleRemovalResult = await userManager.RemoveFromRolesAsync(user, current.Except(request.RoleNames));
-
-                if (!roleRemovalResult.Succeeded)
+                // Keep another active Owner when removing this account's Owner role.
+                if (user.IsActive && current.Contains(AuthenticationConstants.OWNER) &&
+                    !request.RoleNames.Contains(AuthenticationConstants.OWNER))
                 {
-                    logger.LogWarning(
-                        AuthenticationLogConstants.OPERATION_REJECTED,
-                        nameof(ReplaceRolesAsync),
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                    throw new BusinessException(
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    await EnsureAnotherOwnerAsync(id, token);
                 }
 
-                // Add the new membership delta in the same transaction, so a later failure cannot leave a partial role replacement.
-                var roleAdditionResult = await userManager.AddToRolesAsync(user, request.RoleNames.Except(current));
-
-                if (!roleAdditionResult.Succeeded)
+                // Membership order alone must not rewrite the account or revoke sessions.
+                if (!current.Order().SequenceEqual(request.RoleNames.Order()))
                 {
-                    logger.LogWarning(
-                        AuthenticationLogConstants.OPERATION_REJECTED,
-                        nameof(ReplaceRolesAsync),
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                    throw new BusinessException(
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    // Remove only memberships absent from the requested set.
+                    var roleRemovalResult = await userManager.RemoveFromRolesAsync(user, current.Except(request.RoleNames));
+
+                    if (!roleRemovalResult.Succeeded)
+                    {
+                        logger.LogWarning(
+                            AuthenticationLogConstants.OPERATION_REJECTED,
+                            nameof(ReplaceRolesAsync),
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                        throw new BusinessException(
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                            AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    }
+
+                    // Commit membership additions and removals atomically.
+                    var roleAdditionResult = await userManager.AddToRolesAsync(user, request.RoleNames.Except(current));
+
+                    if (!roleAdditionResult.Succeeded)
+                    {
+                        logger.LogWarning(
+                            AuthenticationLogConstants.OPERATION_REJECTED,
+                            nameof(ReplaceRolesAsync),
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                        throw new BusinessException(
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                            AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    }
+
+                    // Invalidate stale cookies and grants only after a real role change.
+                    var securityStampResult = await userManager.UpdateSecurityStampAsync(user);
+
+                    if (!securityStampResult.Succeeded)
+                    {
+                        logger.LogWarning(
+                            AuthenticationLogConstants.OPERATION_REJECTED,
+                            nameof(ReplaceRolesAsync),
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                        throw new BusinessException(
+                            AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                            AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                    }
+
+                    // Require fresh grants after role claims change.
+                    await sessionService.RevokeAllAsync(id, token);
                 }
 
-                // Refresh the native cookie stamp after a real role change; issued grants are revoked below before commit.
-                var securityStampResult = await userManager.UpdateSecurityStampAsync(user);
-
-                if (!securityStampResult.Succeeded)
-                {
-                    logger.LogWarning(
-                        AuthenticationLogConstants.OPERATION_REJECTED,
-                        nameof(ReplaceRolesAsync),
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                    throw new BusinessException(
-                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
-                }
-
-                // Existing grants carry stale role claims after a membership change; require a new authorization.
-                await sessionService.RevokeAllAsync(id, token);
-            }
-
-            // Project the current memberships from persistence instead of echoing the requested role list.
-            return (await userRepository.GetAsync(id, token))!;
-        }, cancellationToken);
+                // Project the current memberships from persistence instead of echoing the requested role list.
+                return (await userRepository.GetAsync(id, token))!;
+            },
+            cancellationToken);
 
     /// <summary>
     /// Invalidates the previous invitation before returning a new one.
@@ -357,41 +386,43 @@ public sealed class UserService(
         Guid id,
         InvitationRequestDto request,
         CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteInTransactionAsync(async token =>
-        {
-            // Require the current concurrency token so resending an invitation cannot overwrite a more recent account operation.
-            var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
-
-            // Only active passwordless accounts remain in invitation setup; completed accounts must use the password-recovery flow.
-            if (!user.IsActive || await userManager.HasPasswordAsync(user))
+        unitOfWork.ExecuteInTransactionAsync(
+            async token =>
             {
-                logger.LogWarning(
-                    AuthenticationLogConstants.OPERATION_REJECTED,
-                    nameof(RegenerateInvitationAsync),
-                    AuthenticationErrorConstants.INVITATION_STATE_INVALID);
-                throw new BusinessException(
-                    AuthenticationErrorConstants.INVITATION_STATE_INVALID,
-                    AuthenticationErrorConstants.SETUP_UNAVAILABLE,
-                    BusinessErrorKind.Conflict);
-            }
+                // Reject stale invitation requests before changing account state.
+                var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
 
-            // Native invitation tokens bind to the security stamp, so regeneration invalidates the previous link.
-            var securityStampResult = await userManager.UpdateSecurityStampAsync(user);
+                // Invitation setup is limited to active passwordless accounts.
+                if (!user.IsActive || await userManager.HasPasswordAsync(user))
+                {
+                    logger.LogWarning(
+                        AuthenticationLogConstants.OPERATION_REJECTED,
+                        nameof(RegenerateInvitationAsync),
+                        AuthenticationErrorConstants.INVITATION_STATE_INVALID);
+                    throw new BusinessException(
+                        AuthenticationErrorConstants.INVITATION_STATE_INVALID,
+                        AuthenticationErrorConstants.SETUP_UNAVAILABLE,
+                        BusinessErrorKind.Conflict);
+                }
 
-            if (!securityStampResult.Succeeded)
-            {
-                logger.LogWarning(
-                    AuthenticationLogConstants.OPERATION_REJECTED,
-                    nameof(RegenerateInvitationAsync),
-                    AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
-                throw new BusinessException(
-                    AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
-                    AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
-            }
+                // Rotate the native stamp to invalidate the previous invitation.
+                var securityStampResult = await userManager.UpdateSecurityStampAsync(user);
 
-            // Build the replacement link after the stamp update; the old invitation is no longer valid once this transaction commits.
-            return await CreateInvitationAsync(user, token);
-        }, cancellationToken);
+                if (!securityStampResult.Succeeded)
+                {
+                    logger.LogWarning(
+                        AuthenticationLogConstants.OPERATION_REJECTED,
+                        nameof(RegenerateInvitationAsync),
+                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED);
+                    throw new BusinessException(
+                        AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED,
+                        AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED);
+                }
+
+                // Create the replacement invitation after rotating its native stamp.
+                return await CreateInvitationAsync(user, token);
+            },
+            cancellationToken);
 
     /// <summary>
     /// Counts current database membership under the invariant lock rather than trusting token claims.
@@ -399,9 +430,11 @@ public sealed class UserService(
     /// <param name="excluded">The account being changed.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The invariant verification.</returns>
-    private async Task EnsureAnotherOwnerAsync(Guid excluded, CancellationToken cancellationToken)
+    private async Task EnsureAnotherOwnerAsync(
+        Guid excluded,
+        CancellationToken cancellationToken)
     {
-        // Callers already hold the membership lock. Query live active memberships while that lock still protects the pending mutation.
+        // Read live memberships while the caller's invariant lock is held.
         var exists = await userRepository.HasAnotherActiveOwnerAsync(excluded, cancellationToken);
 
         if (!exists)
@@ -424,12 +457,17 @@ public sealed class UserService(
     /// <param name="version">The expected opaque version.</param>
     /// <param name="cancellationToken">Cancels the repository's entity query.</param>
     /// <returns>The tracked native user.</returns>
-    private async Task<User> RequireVersionAsync(Guid id, string version, CancellationToken cancellationToken)
+    private async Task<User> RequireVersionAsync(
+        Guid id,
+        string version,
+        CancellationToken cancellationToken)
     {
-        // Entity reads stay in the feature repository; only password, stamp and membership operations use native managers.
-        var user = await userRepository.FirstOrDefaultAsync(predicate: value => value.Id == id, cancellationToken: cancellationToken);
+        // Query entities through the repository; credential mutations remain with Identity.
+        var user = await userRepository.FirstOrDefaultAsync(
+            predicate: value => value.Id == id,
+            cancellationToken: cancellationToken);
 
-        // Classify a missing stored account explicitly; a caller-provided identifier never creates a placeholder account.
+        // A missing account remains a not-found outcome.
         if (user is null)
         {
             logger.LogWarning(
@@ -442,7 +480,7 @@ public sealed class UserService(
                 BusinessErrorKind.NotFound);
         }
 
-        // Reject stale administrative edits before any mutation; Identity also checks the original stamp when it saves.
+        // Reject stale edits before mutation; Identity also checks the stamp during save.
         if (!string.Equals(user.ConcurrencyStamp, version, StringComparison.Ordinal))
         {
             logger.LogWarning(
@@ -472,10 +510,12 @@ public sealed class UserService(
                 AuthenticationLogConstants.OPERATION_REJECTED,
                 nameof(ValidateRolesAsync),
                 AuthenticationErrorConstants.ROLES_INVALID);
-            throw new BusinessException(AuthenticationErrorConstants.ROLES_INVALID, AuthenticationErrorConstants.INVALID_ROLE_SELECTION);
+            throw new BusinessException(
+                    AuthenticationErrorConstants.ROLES_INVALID,
+                    AuthenticationErrorConstants.INVALID_ROLE_SELECTION);
         }
 
-        // Keep role names data-driven through the provisioned catalog; do not turn native role records into a hard-coded enum.
+        // Validate against provisioned roles rather than a hard-coded enum.
         foreach (var name in names)
         {
             if (!await roleService.ExistsAsync(name))
@@ -484,7 +524,9 @@ public sealed class UserService(
                     AuthenticationLogConstants.OPERATION_REJECTED,
                     nameof(ValidateRolesAsync),
                     AuthenticationErrorConstants.ROLES_INVALID);
-                throw new BusinessException(AuthenticationErrorConstants.ROLES_INVALID, AuthenticationErrorConstants.INVALID_ROLE_SELECTION);
+                throw new BusinessException(
+                    AuthenticationErrorConstants.ROLES_INVALID,
+                    AuthenticationErrorConstants.INVALID_ROLE_SELECTION);
             }
         }
     }
@@ -499,17 +541,17 @@ public sealed class UserService(
         User user,
         CancellationToken cancellationToken)
     {
-        // Use the invitation provider and purpose so this proof cannot be reused as a password-reset OTP.
+        // Keep invitation proof separate from password-reset OTP.
         var invitation = await userManager.GenerateUserTokenAsync(
             user,
             AuthenticationConstants.INVITATION_PROVIDER,
             AuthenticationConstants.INVITATION_PURPOSE);
 
-        // Build a link from the trusted deployment issuer; URL-encode the secret and never write the resulting URL to logs.
+        // Build the invitation from the trusted issuer without logging its secret.
         var url = authenticationOptions.Value.Issuer.TrimEnd('/') + AuthenticationConstants.Endpoints.INVITATION_PAGE + "?userId=" + user.Id +
             "&token=" + Uri.EscapeDataString(invitation);
 
-        // Return the public profile and bounded invitation metadata, not the underlying Identity credential state.
+        // Return public account and invitation metadata only.
         return new(
             (await userRepository.GetAsync(user.Id, cancellationToken))!,
             url,

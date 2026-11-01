@@ -19,8 +19,10 @@ public sealed class GetUserQueryHandler(IUserService userService)
     {
         // The service returns an allowlisted projection, never the Identity entity or credential fields.
         var result = await userService.GetAsync(request.UserId, cancellationToken)
-            ?? throw new BusinessException(AuthenticationErrorConstants.USER_MISSING,
-                AuthenticationErrorConstants.ACCOUNT_UNAVAILABLE, BusinessErrorKind.NotFound);
+            ?? throw new BusinessException(
+                AuthenticationErrorConstants.USER_MISSING,
+                AuthenticationErrorConstants.ACCOUNT_UNAVAILABLE,
+                BusinessErrorKind.NotFound);
 
         return new(result);
     }

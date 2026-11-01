@@ -143,9 +143,7 @@ public sealed class UnitOfWork<TContext>(
                 throw new InvalidOperationException(CoreErrorConstants.DatabaseErrors.TRANSACTION_ISOLATION_CONFLICT);
             }
 
-            logger.LogDebug(
-                CoreLogConstants.TransactionLogs.OUTER_TRANSACTION_REUSED,
-                typeof(TContext).Name);
+            logger.LogDebug(CoreLogConstants.TransactionLogs.OUTER_TRANSACTION_REUSED, typeof(TContext).Name);
 
             // The caller that opened the transaction also owns its save, commit and rollback decisions.
             return await action(cancellationToken);
@@ -191,10 +189,7 @@ public sealed class UnitOfWork<TContext>(
                     {
                         // Cancellation may already be requested, but rollback must still be attempted.
                         await transaction.RollbackAsync(CancellationToken.None);
-                        logger.LogWarning(
-                            CoreLogConstants.TransactionLogs.ROLLED_BACK,
-                            typeof(TContext).Name,
-                            exception.GetType().Name);
+                        logger.LogWarning(CoreLogConstants.TransactionLogs.ROLLED_BACK, typeof(TContext).Name, exception.GetType().Name);
                     }
                     catch (Exception rollbackException)
                     {
@@ -234,7 +229,9 @@ public sealed class UnitOfWork<TContext>(
     /// <param name="acceptAllChangesOnSuccess">Whether a successful database save also accepts tracked changes.</param>
     /// <param name="cancellationToken">Cancellation forwarded to the native EF save.</param>
     /// <returns>The number of state entries written by EF.</returns>
-    private async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+    private async Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken)
     {
         logger.LogDebug(CoreLogConstants.TransactionLogs.SAVE_STARTED, typeof(TContext).Name);
 

@@ -6,6 +6,22 @@ namespace ContextHub.Shared.Constants;
 public static class SharedConstants
 {
     /// <summary>
+    /// Defines the supported directions for allowlisted public sort expressions.
+    /// </summary>
+    public static class SortVariables
+    {
+        /// <summary>
+        /// Identifies ascending ordering and the direction used when it is omitted.
+        /// </summary>
+        public const string ASCENDING = "asc";
+
+        /// <summary>
+        /// Identifies descending ordering for an individual clause.
+        /// </summary>
+        public const string DESCENDING = "desc";
+    }
+
+    /// <summary>
     /// Defines defaults for the shared email options contract.
     /// </summary>
     public static class EmailVariables
@@ -15,7 +31,6 @@ public static class SharedConstants
         /// </summary>
         public const int REQUEST_TIMEOUT_SECONDS = 30;
     }
-
 
     /// <summary>
     /// Defines one masking vocabulary and budget for application diagnostics and console rendering.

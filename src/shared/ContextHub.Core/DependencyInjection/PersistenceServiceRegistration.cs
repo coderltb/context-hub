@@ -52,13 +52,16 @@ public static class PersistenceServiceRegistration
         // Reuse the existing audit engine; the owning service must register its actor accessor explicitly.
         services.AddAudit();
 
-        services.AddDbContext<TContext>((provider, options) =>
+        services.AddDbContext<TContext>(
+            (provider, options) =>
         {
             // Configure the service's provider first, then attach the interceptor resolved from this context's scope.
             configure(provider, options);
 
             options.AddInterceptors(provider.GetRequiredService<AuditSaveChangesInterceptor>());
-        }, contextLifetime: ServiceLifetime.Scoped, optionsLifetime: ServiceLifetime.Scoped);
+        },
+            contextLifetime: ServiceLifetime.Scoped,
+            optionsLifetime: ServiceLifetime.Scoped);
 
         // Registration neither connects nor migrates a database and does not alias repository or transaction services.
         return services;

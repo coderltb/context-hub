@@ -10,7 +10,9 @@ public sealed class ApiResponseBoundary
     /// </summary>
     /// <param name="routePrefix">The non-root absolute route prefix with complete, nonempty segments.</param>
     /// <param name="apiVersion">The nonblank public response version.</param>
-    public ApiResponseBoundary(string routePrefix, string apiVersion)
+    public ApiResponseBoundary(
+        string routePrefix,
+        string apiVersion)
     {
         // Reject ambiguous paths rather than broadening response adaptation to unrelated protocols.
         if (string.IsNullOrWhiteSpace(routePrefix) || !routePrefix.StartsWith('/') ||

@@ -20,7 +20,9 @@ public sealed class AtomicCacheService : IAtomicCacheService
     /// </summary>
     /// <param name="connection">The DI-owned shared multiplexer.</param>
     /// <param name="logger">The safe metadata logger.</param>
-    public AtomicCacheService(IConnectionMultiplexer connection, ILogger<AtomicCacheService> logger)
+    public AtomicCacheService(
+        IConnectionMultiplexer connection,
+        ILogger<AtomicCacheService> logger)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(logger);
@@ -37,14 +39,21 @@ public sealed class AtomicCacheService : IAtomicCacheService
     /// <param name="expiration">A strictly positive fixed lifetime.</param>
     /// <param name="cancellationToken">Cancels before dispatch; cannot undo a dispatched Redis command.</param>
     /// <returns>True only when the reservation was created.</returns>
-    public Task<bool> TrySetIfAbsentAsync(string key, string value, TimeSpan expiration, CancellationToken cancellationToken = default)
+    public Task<bool> TrySetIfAbsentAsync(
+        string key,
+        string value,
+        TimeSpan expiration,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(value);
         Validate(key, expiration);
 
         // SET NX and its expiry are one server operation; never follow a successful write with a separate TTL command.
-        return RunAsync(nameof(TrySetIfAbsentAsync), () => _connection.GetDatabase()
-            .StringSetAsync(key, value, expiration, when: When.NotExists), cancellationToken);
+        return RunAsync(
+            nameof(TrySetIfAbsentAsync),
+            () => _connection.GetDatabase()
+            .StringSetAsync(key, value, expiration, when: When.NotExists),
+            cancellationToken);
     }
 
     /// <summary>
@@ -54,20 +63,27 @@ public sealed class AtomicCacheService : IAtomicCacheService
     /// <param name="expiration">The lifetime assigned only on first creation.</param>
     /// <param name="cancellationToken">The cancellation token; no automatic retry is performed.</param>
     /// <returns>The new counter value.</returns>
-    public Task<long> IncrementAsync(string key, TimeSpan expiration, CancellationToken cancellationToken = default)
+    public Task<long> IncrementAsync(
+        string key,
+        TimeSpan expiration,
+        CancellationToken cancellationToken = default)
     {
         Validate(key, expiration);
 
-        return RunAsync(nameof(IncrementAsync), async () =>
+        return RunAsync(
+            nameof(IncrementAsync),
+            async () =>
         {
             // A Lua script closes the INCR/PEXPIRE race. Existing counters retain their original TTL.
             var milliseconds = Math.Max(1, checked((long)Math.Ceiling(expiration.TotalMilliseconds)));
             var result = await _connection.GetDatabase().ScriptEvaluateAsync(
                 CacheConstants.AtomicVariables.INCREMENT_WITH_EXPIRATION,
-                [new RedisKey(key)], [milliseconds]);
+                [new RedisKey(key)],
+                [milliseconds]);
 
             return (long)result;
-        }, cancellationToken);
+        },
+            cancellationToken);
     }
 
     /// <summary>
@@ -76,7 +92,9 @@ public sealed class AtomicCacheService : IAtomicCacheService
     /// <param name="key">The exact service-owned key.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task completing after removal.</returns>
-    public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
+    public async Task RemoveAsync(
+        string key,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
@@ -88,7 +106,9 @@ public sealed class AtomicCacheService : IAtomicCacheService
     /// </summary>
     /// <param name="key">The exact internal key.</param>
     /// <param name="expiration">The requested positive lifetime.</param>
-    internal static void Validate(string key, TimeSpan expiration)
+    internal static void Validate(
+        string key,
+        TimeSpan expiration)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         if (expiration <= TimeSpan.Zero)
@@ -105,7 +125,10 @@ public sealed class AtomicCacheService : IAtomicCacheService
     /// <param name="action">The single native command.</param>
     /// <param name="cancellationToken">Cancels the wait; a dispatched mutation may still complete.</param>
     /// <returns>The native command result.</returns>
-    private async Task<T> RunAsync<T>(string operation, Func<Task<T>> action, CancellationToken cancellationToken)
+    private async Task<T> RunAsync<T>(
+        string operation,
+        Func<Task<T>> action,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

@@ -12,7 +12,10 @@ public static class ExpirationHelper
     /// <param name="clock">The clock controlling the current UTC instant.</param>
     /// <param name="padding">Nonnegative safety padding; null selects the shared sixty-second default.</param>
     /// <returns>The remaining lifetime after padding, or zero when already expired or inside the safety window.</returns>
-    public static TimeSpan GetSafeTtl(DateTimeOffset expiresAt, TimeProvider clock, TimeSpan? padding = null)
+    public static TimeSpan GetSafeTtl(
+        DateTimeOffset expiresAt,
+        TimeProvider clock,
+        TimeSpan? padding = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
@@ -30,7 +33,9 @@ public static class ExpirationHelper
     /// <param name="padding">Nonnegative safety padding; null selects the shared sixty-second default.</param>
     /// <returns>The lifetime after padding, or zero for missing, expired or near-expiry values.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Padding is negative or the seconds cannot be represented by a TimeSpan.</exception>
-    public static TimeSpan GetSafeTtlSpan(long? remainingSeconds, TimeSpan? padding = null)
+    public static TimeSpan GetSafeTtlSpan(
+        long? remainingSeconds,
+        TimeSpan? padding = null)
     {
         var safetyPadding = GetPadding(padding);
         if (remainingSeconds is not > 0)
@@ -51,7 +56,9 @@ public static class ExpirationHelper
     /// <param name="padding">Nonnegative safety padding; null selects the shared sixty-second default.</param>
     /// <returns>The earlier deadline; this method does not decide whether that deadline has already passed.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Padding is negative or the adjusted date cannot be represented.</exception>
-    public static DateTimeOffset GetSafeTime(DateTimeOffset expiresAt, TimeSpan? padding = null)
+    public static DateTimeOffset GetSafeTime(
+        DateTimeOffset expiresAt,
+        TimeSpan? padding = null)
     {
         var safetyPadding = GetPadding(padding);
 

@@ -9,11 +9,11 @@ public sealed class GetClientsRequestDto
     /// Gets or sets the one-based page number; omitted requests use page 1.
     /// </summary>
     /// <example>1</example>
-    public int Page { get; init; } = 1;
+    public int Page { get; init; } = SharedConstants.PaginationVariables.FIRST_PAGE;
 
     /// <summary>
     /// Gets or sets the number of items per page, from 1 through 100; the default is 20.
     /// </summary>
     /// <example>20</example>
-    public int PageSize { get; init; } = 20;
+    public int PageSize { get; init; } = SharedConstants.PaginationVariables.DEFAULT_PAGE_SIZE;
 }

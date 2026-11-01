@@ -1,0 +1,493 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Owner package version preview data V1",
+  "description": "The REST envelope data for PreviewPackageVersion; transient, never persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "purpose",
+    "changes",
+    "consumerImpact",
+    "readiness",
+    "publicPreview"
+  ],
+  "properties": {
+    "purpose": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "summary",
+            "whenToUse",
+            "whenNotToUse"
+          ],
+          "properties": {
+            "summary": {
+              "$ref": "#/$defs/text"
+            },
+            "whenToUse": {
+              "$ref": "#/$defs/text"
+            },
+            "whenNotToUse": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        }
+      ]
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baselineVersion",
+        "summary",
+        "items"
+      ],
+      "properties": {
+        "baselineVersion": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+              "maxLength": 64
+            }
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/text"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "kind"
+            ],
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/path"
+              },
+              "kind": {
+                "enum": [
+                  "added",
+                  "removed",
+                  "changed"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "consumerImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "changedAreas",
+        "summary"
+      ],
+      "properties": {
+        "changedAreas": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "metadata",
+              "requirements",
+              "dependencies",
+              "instructions",
+              "verification"
+            ]
+          }
+        },
+        "summary": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "findings",
+        "candidateContentHash"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "ready",
+            "ready_with_warnings",
+            "blocked"
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "severity",
+              "path",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "maxLength": 128
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "info"
+                ]
+              },
+              "path": {
+                "$ref": "#/$defs/path"
+              },
+              "message": {
+                "$ref": "#/$defs/text"
+              }
+            }
+          }
+        },
+        "candidateContentHash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      }
+    },
+    "publicPreview": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/publicPreview"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8192
+    },
+    "path": {
+      "type": "string",
+      "maxLength": 512,
+      "description": "JSON Pointer relative to candidate {manifest,bundle}; empty means the whole candidate. Never an authoring filesystem path."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?$",
+      "maxLength": 64
+    },
+    "publicPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageId",
+        "packageType",
+        "version",
+        "name",
+        "summary",
+        "tags",
+        "capabilities",
+        "requiredCapabilities",
+        "dependencies",
+        "conflictsWith",
+        "bundle"
+      ],
+      "properties": {
+        "packageId": {
+          "$ref": "bundle-common.schema.json#/$defs/packageId"
+        },
+        "packageType": {
+          "enum": [
+            "agent",
+            "skill",
+            "rule",
+            "workflow"
+          ]
+        },
+        "version": {
+          "$ref": "#/$defs/version"
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200
+        },
+        "summary": {
+          "$ref": "#/$defs/text"
+        },
+        "tags": {
+          "$ref": "public-manifest.schema.json#/properties/tags"
+        },
+        "capabilities": {
+          "$ref": "public-manifest.schema.json#/properties/capabilities"
+        },
+        "requiredCapabilities": {
+          "$ref": "public-manifest.schema.json#/properties/required_capabilities"
+        },
+        "dependencies": {
+          "$ref": "public-manifest.schema.json#/properties/dependencies"
+        },
+        "conflictsWith": {
+          "$ref": "public-manifest.schema.json#/properties/conflicts_with"
+        },
+        "bundle": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "packageType": {
+                "const": "agent"
+              }
+            },
+            "required": [
+              "packageType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bundle": {
+                "$ref": "agent.bundle.schema.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "packageType": {
+                "const": "skill"
+              }
+            },
+            "required": [
+              "packageType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bundle": {
+                "$ref": "skill.bundle.schema.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "packageType": {
+                "const": "rule"
+              }
+            },
+            "required": [
+              "packageType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bundle": {
+                "$ref": "rule.bundle.schema.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "packageType": {
+                "const": "workflow"
+              }
+            },
+            "required": [
+              "packageType"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bundle": {
+                "$ref": "workflow.bundle.schema.json"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "readiness": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "readiness": {
+            "properties": {
+              "findings": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "readiness": {
+            "properties": {
+              "status": {
+                "const": "ready_with_warnings"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "readiness": {
+            "properties": {
+              "findings": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "warning"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                },
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "enum": [
+                        "info",
+                        "warning"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "readiness": {
+            "properties": {
+              "status": {
+                "const": "blocked"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "readiness": {
+            "properties": {
+              "findings": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "error"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "readiness": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "ready",
+                  "ready_with_warnings"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "publicPreview": {
+            "$ref": "#/$defs/publicPreview"
+          },
+          "purpose": {
+            "type": "object"
+          },
+          "readiness": {
+            "properties": {
+              "candidateContentHash": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -20,7 +20,9 @@ public sealed class DistributedLockService : IDistributedLockService
     /// </summary>
     /// <param name="connection">The DI-owned Redis connection.</param>
     /// <param name="logger">The safe metadata logger.</param>
-    public DistributedLockService(IConnectionMultiplexer connection, ILogger<DistributedLockService> logger)
+    public DistributedLockService(
+        IConnectionMultiplexer connection,
+        ILogger<DistributedLockService> logger)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(logger);
@@ -36,7 +38,10 @@ public sealed class DistributedLockService : IDistributedLockService
     /// <param name="leaseDuration">The positive provider-supported renewal lease.</param>
     /// <param name="cancellationToken">Cancels acquisition, preserving cancellation exceptions.</param>
     /// <returns>The owned lease, or null when native acquisition does not succeed in time.</returns>
-    public async Task<IDistributedLockLease?> TryAcquireAsync(string key, TimeSpan leaseDuration, CancellationToken cancellationToken = default)
+    public async Task<IDistributedLockLease?> TryAcquireAsync(
+        string key,
+        TimeSpan leaseDuration,
+        CancellationToken cancellationToken = default)
     {
         AtomicCacheService.Validate(key, leaseDuration);
         cancellationToken.ThrowIfCancellationRequested();

@@ -221,6 +221,7 @@ public static class AuthenticationConstants
     /// Names the local continuation parameter used by Razor and logout confirmation.
     /// </summary>
     public const string RETURN_URL_PARAMETER = "returnUrl";
+
     /// <summary>
     /// Identifies the public development documentation client.
     /// </summary>

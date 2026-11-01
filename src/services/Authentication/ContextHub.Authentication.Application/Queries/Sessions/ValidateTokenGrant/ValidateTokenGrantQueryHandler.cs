@@ -17,7 +17,9 @@ public sealed class ValidateTokenGrantQueryHandler(
     /// <param name="request">The use-case marker; the selected subject is read from the authenticated accessor.</param>
     /// <param name="cancellationToken">Cancels the current-account query.</param>
     /// <returns>Whether native issuance may continue.</returns>
-    public async ValueTask<bool> Handle(ValidateTokenGrantQuery request, CancellationToken cancellationToken)
+    public async ValueTask<bool> Handle(
+        ValidateTokenGrantQuery request,
+        CancellationToken cancellationToken)
     {
         var subject = authService.Get<string>(CoreConstants.AuthenticationVariables.SUBJECT_CLAIM);
 

@@ -51,15 +51,16 @@ public sealed class HybridCacheService : ICacheService
     /// <param name="key">The validated exact key.</param>
     /// <param name="cancellationToken">Cancels this cache-only operation.</param>
     /// <returns>The existing value or default; native L2 failure-as-miss behavior is retained.</returns>
-    public async ValueTask<T?> GetAsync<T>(CacheKey key, CancellationToken cancellationToken = default)
+    public async ValueTask<T?> GetAsync<T>(
+        CacheKey key,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
 
         _logger.LogDebug(CacheLogConstants.EntryLogs.STARTED, nameof(GetAsync), key.Namespace);
 
         // HybridCache requires a callback, but DisableUnderlyingData prevents it from running or caching a miss.
-        var value = await _cache.GetOrCreateAsync<T>(
-            key.Value, static _ => default, _readOptions, cancellationToken: cancellationToken);
+        var value = await _cache.GetOrCreateAsync<T>(key.Value, static _ => default, _readOptions, cancellationToken: cancellationToken);
 
         // Default-valued entries cannot be distinguished from misses here; do not invent hit/miss diagnostics.
         _logger.LogDebug(CacheLogConstants.EntryLogs.RESOLVED, key.Namespace);
@@ -135,7 +136,9 @@ public sealed class HybridCacheService : ICacheService
     /// <param name="key">The exact key.</param>
     /// <param name="cancellationToken">Stops the invalidation.</param>
     /// <returns>The native removal operation.</returns>
-    public async ValueTask RemoveAsync(CacheKey key, CancellationToken cancellationToken = default)
+    public async ValueTask RemoveAsync(
+        CacheKey key,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
 
@@ -152,7 +155,9 @@ public sealed class HybridCacheService : ICacheService
     /// <param name="tag">The validated capability-owned group.</param>
     /// <param name="cancellationToken">Stops the invalidation.</param>
     /// <returns>The native invalidation operation.</returns>
-    public async ValueTask RemoveByTagAsync(string tag, CancellationToken cancellationToken = default)
+    public async ValueTask RemoveByTagAsync(
+        string tag,
+        CancellationToken cancellationToken = default)
     {
         CacheEntryPolicy.ValidateTag(tag);
 

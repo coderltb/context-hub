@@ -22,9 +22,7 @@ public class UserRepository(
     {
         if (!request.Sort.TryParseUserSort(out var fields))
         {
-            throw new BusinessException(
-                AuthenticationErrorConstants.INVALID_SORT,
-                AuthenticationErrorConstants.INVALID_SORT_MESSAGE);
+            throw new BusinessException(AuthenticationErrorConstants.INVALID_SORT, AuthenticationErrorConstants.INVALID_SORT_MESSAGE);
         }
 
         QueryOrder<User>? order = null;
@@ -51,11 +49,7 @@ public class UserRepository(
             TextFields = [value => value.UserName, value => value.Email],
             FieldFilters = [request.IsActive is { } active ? value => value.IsActive == active : null]
         };
-        var result = await GetPageAsync<UserResponseDto>(
-            page,
-            order,
-            search: search,
-            cancellationToken: cancellationToken);
+        var result = await GetPageAsync<UserResponseDto>(page, order, search: search, cancellationToken: cancellationToken);
 
         // An empty page has no memberships to enrich, even when earlier pages contain users.
         if (result.Items.Count == 0)
@@ -102,11 +96,11 @@ public class UserRepository(
     /// <param name="id">The account identifier.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The approved account projection.</returns>
-    public virtual async Task<UserResponseDto?> GetAsync(Guid id, CancellationToken cancellationToken)
+    public virtual async Task<UserResponseDto?> GetAsync(
+        Guid id,
+        CancellationToken cancellationToken)
     {
-        var user = await FirstOrDefaultAsync<UserResponseDto>(
-            predicate: value => value.Id == id,
-            cancellationToken: cancellationToken);
+        var user = await FirstOrDefaultAsync<UserResponseDto>(predicate: value => value.Id == id, cancellationToken: cancellationToken);
 
         if (user is null)
         {
@@ -158,9 +152,7 @@ public class UserRepository(
     /// <param name="cancellationToken">Cancels lock acquisition.</param>
     /// <returns>The asynchronous lock acquisition.</returns>
     public virtual async Task LockOwnerMembershipAsync(CancellationToken cancellationToken) =>
-        _ = await authenticationDbContext.Roles.FromSqlRaw(
-            AuthenticationSqlConstants.LOCK_OWNER_ROLE,
-            AuthenticationConstants.OWNER.ToUpperInvariant())
+        _ = await authenticationDbContext.Roles.FromSqlRaw(AuthenticationSqlConstants.LOCK_OWNER_ROLE, AuthenticationConstants.OWNER.ToUpperInvariant())
             .SingleAsync(cancellationToken);
 
     /// <summary>

@@ -44,7 +44,8 @@ public sealed class ApiEnvelopeSchemaTransformer(ApiResponseBoundary apiResponse
             {
                 AllOf = [metadata],
                 Examples = [JsonSerializer.SerializeToNode(
-                    ApiErrorExampleFactory.CreateMetadata(apiResponseBoundary.ApiVersion), context.JsonTypeInfo.Options)!]
+                    ApiErrorExampleFactory.CreateMetadata(apiResponseBoundary.ApiVersion),
+                    context.JsonTypeInfo.Options)!]
             };
         }
 

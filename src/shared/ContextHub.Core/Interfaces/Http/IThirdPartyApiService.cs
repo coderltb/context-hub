@@ -13,7 +13,9 @@ public interface IThirdPartyApiService
     /// <param name="cancellationToken">Cancels sending and response consumption without manufacturing an HTTP response.</param>
     /// <returns>Credential-masked text within the shared convenience-read byte limit; ordinary fields remain visible.</returns>
     /// <exception cref="HttpRequestException">The provider returned a failure status; the exception retains that status, not its body.</exception>
-    Task<string> HandleApiData<TRequest>(TRequest request, CancellationToken cancellationToken = default)
+    Task<string> HandleApiData<TRequest>(
+        TRequest request,
+        CancellationToken cancellationToken = default)
         where TRequest : BaseThirdPartyApiRequest;
 
     /// <summary>
@@ -24,7 +26,9 @@ public interface IThirdPartyApiService
     /// <param name="request">The extensible integration DTO; it is mapped, never serialized as the request body.</param>
     /// <param name="cancellationToken">Cancels sending and bounded response consumption.</param>
     /// <returns>The typed value, or default for blank or JSON null content; malformed JSON raises a native parse error.</returns>
-    Task<TResponse?> HandleApiData<TRequest, TResponse>(TRequest request, CancellationToken cancellationToken = default)
+    Task<TResponse?> HandleApiData<TRequest, TResponse>(
+        TRequest request,
+        CancellationToken cancellationToken = default)
         where TRequest : BaseThirdPartyApiRequest;
 
     /// <summary>

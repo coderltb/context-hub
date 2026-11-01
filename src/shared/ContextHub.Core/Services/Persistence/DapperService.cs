@@ -8,7 +8,7 @@ public sealed class DapperService : IDapperService
     /// <summary>
     /// Opens connections only for commands that do not borrow a transaction.
     /// </summary>
-    private readonly IDbConnectionFactory _factory;
+    private readonly IDbConnectionFactory _dbConnectionFactory;
 
     /// <summary>
     /// Records command lifecycle metadata without SQL or parameter values.
@@ -18,14 +18,16 @@ public sealed class DapperService : IDapperService
     /// <summary>
     /// Creates the facade from DI-owned dependencies.
     /// </summary>
-    /// <param name="factory">The PostgreSQL connection factory.</param>
+    /// <param name="dbConnectionFactory">The PostgreSQL connection factory.</param>
     /// <param name="logger">The metadata-only diagnostic logger.</param>
-    public DapperService(IDbConnectionFactory factory, ILogger<DapperService> logger)
+    public DapperService(
+        IDbConnectionFactory dbConnectionFactory,
+        ILogger<DapperService> logger)
     {
-        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(dbConnectionFactory);
         ArgumentNullException.ThrowIfNull(logger);
 
-        _factory = factory;
+        _dbConnectionFactory = dbConnectionFactory;
         _logger = logger;
     }
 
@@ -37,10 +39,18 @@ public sealed class DapperService : IDapperService
     /// <param name="param">The optional bound parameter object; never logged.</param>
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
-    public Task<IReadOnlyList<T>> QueryAsync<T>(string sql, object? param = null, DapperCommandOptions? options = null)
+    public Task<IReadOnlyList<T>> QueryAsync<T>(
+        string sql,
+        object? param = null,
+        DapperCommandOptions? options = null)
     {
         // Dapper buffers this command; AsList reuses that buffer before the owned connection is disposed.
-        return WithCommandAsync(sql, param, options, nameof(QueryAsync), async (connection, definition) =>
+        return WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QueryAsync),
+            async (connection, definition) =>
             (IReadOnlyList<T>)(await connection.QueryAsync<T>(definition)).AsList());
     }
 
@@ -56,14 +66,23 @@ public sealed class DapperService : IDapperService
     /// <param name="param">Optional bound parameters, never logged.</param>
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>The fully buffered mapped rows.</returns>
-    public Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TResult>(string sql,
-        Func<TFirst, TSecond, TResult> map, string splitOn, object? param = null, DapperCommandOptions? options = null)
+    public Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TResult>(
+        string sql,
+        Func<TFirst, TSecond, TResult> map,
+        string splitOn,
+        object? param = null,
+        DapperCommandOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentException.ThrowIfNullOrWhiteSpace(splitOn);
 
         // Native CommandDefinition preserves cancellation and transaction ownership for JOIN mapping too.
-        return WithCommandAsync(sql, param, options, nameof(QueryAsync), async (connection, definition) =>
+        return WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QueryAsync),
+            async (connection, definition) =>
             (IReadOnlyList<TResult>)(await connection.QueryAsync(definition, map, splitOn)).AsList());
     }
 
@@ -80,14 +99,23 @@ public sealed class DapperService : IDapperService
     /// <param name="param">Optional bound parameters, never logged.</param>
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>The fully buffered mapped rows.</returns>
-    public Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TThird, TResult>(string sql,
-        Func<TFirst, TSecond, TThird, TResult> map, string splitOn, object? param = null, DapperCommandOptions? options = null)
+    public Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TThird, TResult>(
+        string sql,
+        Func<TFirst, TSecond, TThird, TResult> map,
+        string splitOn,
+        object? param = null,
+        DapperCommandOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(map);
         ArgumentException.ThrowIfNullOrWhiteSpace(splitOn);
 
         // The callback owns feature shaping; the facade only reuses Dapper's buffered row splitting.
-        return WithCommandAsync(sql, param, options, nameof(QueryAsync), async (connection, definition) =>
+        return WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QueryAsync),
+            async (connection, definition) =>
             (IReadOnlyList<TResult>)(await connection.QueryAsync(definition, map, splitOn)).AsList());
     }
 
@@ -100,7 +128,12 @@ public sealed class DapperService : IDapperService
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
     public Task<T> QueryFirstAsync<T>(string sql, object? param = null, DapperCommandOptions? options = null) =>
-        WithCommandAsync(sql, param, options, nameof(QueryFirstAsync), (connection, definition) => connection.QueryFirstAsync<T>(definition));
+        WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QueryFirstAsync),
+            (connection, definition) => connection.QueryFirstAsync<T>(definition));
 
     /// <summary>
     /// Returns the first row, or default when no row exists.
@@ -111,7 +144,12 @@ public sealed class DapperService : IDapperService
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
     public Task<T?> QueryFirstOrDefaultAsync<T>(string sql, object? param = null, DapperCommandOptions? options = null) =>
-        WithCommandAsync(sql, param, options, nameof(QueryFirstOrDefaultAsync), (connection, definition) => connection.QueryFirstOrDefaultAsync<T>(definition));
+        WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QueryFirstOrDefaultAsync),
+            (connection, definition) => connection.QueryFirstOrDefaultAsync<T>(definition));
 
     /// <summary>
     /// Requires exactly one row and rejects zero or multiple rows.
@@ -122,7 +160,12 @@ public sealed class DapperService : IDapperService
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
     public Task<T> QuerySingleAsync<T>(string sql, object? param = null, DapperCommandOptions? options = null) =>
-        WithCommandAsync(sql, param, options, nameof(QuerySingleAsync), (connection, definition) => connection.QuerySingleAsync<T>(definition));
+        WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QuerySingleAsync),
+            (connection, definition) => connection.QuerySingleAsync<T>(definition));
 
     /// <summary>
     /// Returns a single row or default, rejecting multiple rows.
@@ -133,7 +176,12 @@ public sealed class DapperService : IDapperService
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
     public Task<T?> QuerySingleOrDefaultAsync<T>(string sql, object? param = null, DapperCommandOptions? options = null) =>
-        WithCommandAsync(sql, param, options, nameof(QuerySingleOrDefaultAsync), (connection, definition) => connection.QuerySingleOrDefaultAsync<T>(definition));
+        WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QuerySingleOrDefaultAsync),
+            (connection, definition) => connection.QuerySingleOrDefaultAsync<T>(definition));
 
     /// <summary>
     /// Executes a command without taking ownership of a caller transaction.
@@ -143,7 +191,12 @@ public sealed class DapperService : IDapperService
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the affected row count.</returns>
     public Task<int> ExecuteAsync(string sql, object? param = null, DapperCommandOptions? options = null) =>
-        WithCommandAsync(sql, param, options, nameof(ExecuteAsync), (connection, definition) => connection.ExecuteAsync(definition));
+        WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(ExecuteAsync),
+            (connection, definition) => connection.ExecuteAsync(definition));
 
     /// <summary>
     /// Returns the first scalar value or default.
@@ -154,7 +207,12 @@ public sealed class DapperService : IDapperService
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
     public Task<T?> ExecuteScalarAsync<T>(string sql, object? param = null, DapperCommandOptions? options = null) =>
-        WithCommandAsync(sql, param, options, nameof(ExecuteScalarAsync), (connection, definition) => connection.ExecuteScalarAsync<T>(definition));
+        WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(ExecuteScalarAsync),
+            (connection, definition) => connection.ExecuteScalarAsync<T>(definition));
 
     /// <summary>
     /// Consumes multiple result sets within a bounded callback lifetime.
@@ -165,11 +223,20 @@ public sealed class DapperService : IDapperService
     /// <param name="param">The optional bound parameter object; never logged.</param>
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
-    public Task<TResult> QueryMultipleAsync<TResult>(string sql, Func<SqlMapper.GridReader, Task<TResult>> map, object? param = null, DapperCommandOptions? options = null) 
+    public Task<TResult> QueryMultipleAsync<TResult>(
+        string sql,
+        Func<SqlMapper.GridReader, Task<TResult>> map,
+        object? param = null,
+        DapperCommandOptions? options = null) 
     {
         ArgumentNullException.ThrowIfNull(map);
 
-        return WithCommandAsync(sql, param, options, nameof(QueryMultipleAsync), async (connection, definition) =>
+        return WithCommandAsync(
+            sql,
+            param,
+            options,
+            nameof(QueryMultipleAsync),
+            async (connection, definition) =>
         {
             // The reader cannot outlive its callback, including callback failure and cancellation.
             var grid = await connection.QueryMultipleAsync(definition);
@@ -199,7 +266,10 @@ public sealed class DapperService : IDapperService
     /// <param name="action">The native Dapper operation.</param>
     /// <returns>The completed result before an owned connection is released.</returns>
     private async Task<TResult> WithCommandAsync<TResult>(
-        string sql, object? param, DapperCommandOptions? options, string operation,
+        string sql,
+        object? param,
+        DapperCommandOptions? options,
+        string operation,
         Func<IDbConnection, CommandDefinition, Task<TResult>> action)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sql);
@@ -209,8 +279,14 @@ public sealed class DapperService : IDapperService
         options.CancellationToken.ThrowIfCancellationRequested();
 
         // Buffer all query results and propagate cancellation into the provider; never log SQL or parameters.
-        var definition = new CommandDefinition(sql, param, options.Transaction, options.CommandTimeout,
-            options.CommandType, CommandFlags.Buffered, options.CancellationToken);
+        var definition = new CommandDefinition(
+            sql,
+            param,
+            options.Transaction,
+            options.CommandTimeout,
+            options.CommandType,
+            CommandFlags.Buffered,
+            options.CancellationToken);
         _logger.LogDebug(CoreLogConstants.DatabaseLogs.STARTED, operation, options.Transaction is not null);
 
         TResult result;
@@ -227,7 +303,7 @@ public sealed class DapperService : IDapperService
         }
         else
         {
-            var connection = await _factory.GetOpenConnectionAsync(options.CancellationToken);
+            var connection = await _dbConnectionFactory.GetOpenConnectionAsync(options.CancellationToken);
             var operationFailed = true;
             try
             {
@@ -252,7 +328,10 @@ public sealed class DapperService : IDapperService
     /// <param name="operationFailed">Whether an earlier operation failure is already being rethrown.</param>
     /// <param name="operation">The safe command operation name.</param>
     /// <returns>The asynchronous cleanup attempt.</returns>
-    private async ValueTask DisposeOwnedAsync(IAsyncDisposable resource, bool operationFailed, string operation)
+    private async ValueTask DisposeOwnedAsync(
+        IAsyncDisposable resource,
+        bool operationFailed,
+        string operation)
     {
         try
         {
@@ -261,8 +340,12 @@ public sealed class DapperService : IDapperService
         catch (Exception cleanupFailure) when (operationFailed)
         {
             // Keep the primary failure; without one, this filter does not match and cleanup errors remain observable.
-            _logger.LogWarning(CoreLogConstants.DatabaseLogs.CLEANUP_FAILED,
-                operation, resource.GetType().Name, cleanupFailure.GetType().Name);
+            _logger.LogWarning(
+                CoreLogConstants.DatabaseLogs.CLEANUP_FAILED,
+                operation,
+                resource.GetType().Name,
+                cleanupFailure.GetType().Name);
         }
     }
 }
+

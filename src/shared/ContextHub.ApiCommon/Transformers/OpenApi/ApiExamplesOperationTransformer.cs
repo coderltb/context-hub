@@ -14,7 +14,9 @@ public sealed class ApiExamplesOperationTransformer(ILogger<ApiExamplesOperation
     /// <param name="context">The endpoint metadata and document services.</param>
     /// <param name="cancellationToken">Cancellation for document generation.</param>
     /// <returns>The completion of example enrichment.</returns>
-    public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context,
+    public Task TransformAsync(
+        OpenApiOperation operation,
+        OpenApiOperationTransformerContext context,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -101,7 +103,10 @@ public sealed class ApiExamplesOperationTransformer(ILogger<ApiExamplesOperation
                 throw new InvalidOperationException(ApiCommonErrorConstants.OpenApiErrors.INVALID_EXAMPLE_NAME);
             }
 
-            var example = OpenApiExampleFactory.Create(response.ProviderType, context.ApplicationServices, serializerOptions,
+            var example = OpenApiExampleFactory.Create(
+                response.ProviderType,
+                context.ApplicationServices,
+                serializerOptions,
                 OpenApiOperationMetadataHelper.ResponseType(context, registry, response.StatusCode));
             foreach (var media in mediaTypes)
             {

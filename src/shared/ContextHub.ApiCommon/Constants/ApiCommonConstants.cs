@@ -52,6 +52,11 @@ public static class ApiCommonConstants
         public const string MULTIPART = "multipart";
 
         /// <summary>
+        /// Identifies an endpoint whose payload is deliberately excluded from diagnostics.
+        /// </summary>
+        public const string METADATA_ONLY = "metadata_only";
+
+        /// <summary>
         /// Identifies a transport, binary or deferred value excluded from DTO serialization.
         /// </summary>
         public const string UNSUPPORTED = "unsupported_payload";
@@ -70,7 +75,7 @@ public static class ApiCommonConstants
     /// <summary>
     /// Content type for the public API JSON envelope.
     /// </summary>
-    public const string JSON_CONTENT_TYPE = "application/json";
+    public const string JSON_CONTENT_TYPE = SharedConstants.HttpVariables.JSON;
 
     /// <summary>
     /// Canonical correlation header and request item key.

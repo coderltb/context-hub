@@ -16,7 +16,9 @@ public static class HealthResponseWriter
     /// <param name="context">The health HTTP request whose cancellation controls writing.</param>
     /// <param name="report">The report selected by the host's liveness predicate.</param>
     /// <returns>The native JSON response write.</returns>
-    public static Task WriteLivenessAsync(HttpContext context, HealthReport report)
+    public static Task WriteLivenessAsync(
+        HttpContext context,
+        HealthReport report)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(report);
@@ -24,7 +26,8 @@ public static class HealthResponseWriter
         var healthy = report.Status == HealthStatus.Healthy;
         context.Response.StatusCode = healthy ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable;
 
-        return context.Response.WriteAsJsonAsync(new { status = healthy ? HealthConstants.HEALTHY : HealthConstants.UNHEALTHY },
+        return context.Response.WriteAsJsonAsync(
+            new { status = healthy ? HealthConstants.HEALTHY : HealthConstants.UNHEALTHY },
             options: JsonOptions,
             cancellationToken: context.RequestAborted);
     }
@@ -35,13 +38,14 @@ public static class HealthResponseWriter
     /// <param name="context">The health HTTP request.</param>
     /// <param name="report">The report selected by the host's required-readiness predicate.</param>
     /// <returns>The native JSON write containing only stable names, statuses and durations.</returns>
-    public static Task WriteReadinessAsync(HttpContext context, HealthReport report)
+    public static Task WriteReadinessAsync(
+        HttpContext context,
+        HealthReport report)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(report);
 
-        // Descriptions, exceptions and Data can contain credentials. Project fields explicitly rather than serializing entries.
-        // Check names must be stable internal labels, never endpoint URLs or connection strings.
+        // Expose only stable check labels and safe fields; native descriptions and Data may contain secrets.
         var entries = report.Entries
             .Where(entry => entry.Key != HealthConstants.SELF)
             .OrderBy(entry => entry.Key, StringComparer.Ordinal)
@@ -60,7 +64,8 @@ public static class HealthResponseWriter
             durationMs = entry.Value.Duration.TotalMilliseconds
         });
 
-        return context.Response.WriteAsJsonAsync(new { status = healthy ? HealthConstants.HEALTHY : HealthConstants.UNHEALTHY, checks },
+        return context.Response.WriteAsJsonAsync(
+            new { status = healthy ? HealthConstants.HEALTHY : HealthConstants.UNHEALTHY, checks },
             options: JsonOptions,
             cancellationToken: context.RequestAborted);
     }

@@ -5,6 +5,28 @@ namespace ContextHub.Backend.Tests.Shared.ContextHub.Shared.Helpers;
 /// </summary>
 public sealed class LogMaskingTests
 {
+
+    /// <summary>
+    /// Reports actual redaction or uninspectable input without treating JSON formatting as credential evidence.
+    /// </summary>
+    /// <param name="input">The safe fixture text supplied to the existing redaction pipeline.</param>
+    /// <param name="expected">Whether a value is redacted or inspection fails closed.</param>
+    [Theory]
+    [InlineData("Example: {\"safe\": true}", false)]
+    [InlineData("Example: {\"password\":\"***MASKED***\", \"safe\":true}", false)]
+    [InlineData("Example: {\"password\":\"private-value\", \"safe\":true}", true)]
+    [InlineData("https://example.com/?%74oken=private-value", true)]
+    [InlineData("https://example.com/docs/token-guide", false)]
+    [InlineData("https://user:private-value@example.com/", true)]
+    [InlineData("{\"password\":\"private-value\"", true)]
+    [InlineData("{\"safe\":1,\"safe\":2}", true)]
+    [InlineData("tokenCount=12; label=safe", false)]
+    public void SensitiveDataDetectionIgnoresFormatting(string input, bool expected)
+    {
+        Assert.Equal(expected, LogMaskingHelper.ContainsSensitiveData(input));
+    }
+
+
     /// <summary>
     /// Masks password-change credentials by complete field name while preserving harmless counters.
     /// </summary>

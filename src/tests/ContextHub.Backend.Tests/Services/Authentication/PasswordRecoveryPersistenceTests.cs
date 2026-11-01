@@ -59,6 +59,7 @@ public sealed class PasswordRecoveryPersistenceTests : IAsyncLifetime
         });
         builder.Services.AddLoggingInfrastructure(builder.Configuration, "recovery-persistence-tests", Environments.Development);
         builder.Services.AddAuthenticationApi(builder.Configuration, builder.Environment);
+        builder.Services.AddPostgreSqlFixture<AuthenticationDbContext>(_database.GetConnectionString());
         builder.Services.RemoveAll<IEmailService>();
         builder.Services.AddSingleton<IEmailService>(_email);
         builder.Services.AddDbContext<AuthenticationDbContext>((_, options) => options.AddInterceptors(_failure));

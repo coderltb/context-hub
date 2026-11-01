@@ -51,6 +51,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
         });
         builder.Services.AddLoggingInfrastructure(builder.Configuration, "authentication-protocol-tests", Environments.Development);
         builder.Services.AddAuthenticationApi(builder.Configuration, builder.Environment);
+        builder.Services.AddPostgreSqlFixture<AuthenticationDbContext>(_database.GetConnectionString());
         builder.Services.Configure<OpenIddictServerOptions>(options => options.TimeProvider = _clock);
         builder.Services.Configure<OpenIddictValidationOptions>(options => options.TimeProvider = _clock);
         _app = builder.Build();
@@ -64,6 +65,56 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
         _app.UseAuthenticationApi();
         await _app.StartAsync();
         _app.GetTestServer().BaseAddress = new Uri("https://localhost");
+    }
+
+    /// <summary>
+    /// Context Hub validates real Owner and opaque client credentials through the running Authentication protocol.
+    /// </summary>
+    /// <returns>The separate-host actor, tool-grant and immediate revocation assertions.</returns>
+    [Fact]
+    public async Task ContextHubUsesNativeIntrospectionAndRechecksRevokedClient()
+    {
+        using var authentication = _app.GetTestClient();
+        await RegisterAsync(authentication, "hub-owner");
+        var cookie = await LoginAsync(authentication, "hub-owner");
+        var grant = await AuthorizeAsync(authentication, cookie, swagger: true);
+        var credentials = await ExchangeAsync(authentication, grant.Code, grant.Verifier, swagger: true);
+        var ownerToken = credentials.GetProperty("access_token").GetString()!;
+        using var create = new HttpRequestMessage(HttpMethod.Post, "/api/admin/v1/clients")
+        {
+            Content = JsonContent.Create(new CreateClientRequestDto("hub-client") { AllowedTools = ["catalog_search"] })
+        };
+        create.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        using var issued = await authentication.SendAsync(create);
+        var data = (await ReadJsonAsync(issued, HttpStatusCode.Created)).GetProperty("data");
+        var clientToken = data.GetProperty("token").GetString()!;
+        var clientId = data.GetProperty("clientId").GetGuid();
+        var tokenId = data.GetProperty("tokenId").GetGuid();
+
+        await using var hub = await ContextHubV1.McpTransportTests.CreateHostAsync(_app.GetTestServer().CreateHandler(), "https://localhost/", new string('x', 32));
+        using var http = hub.GetTestClient();
+        http.BaseAddress = new Uri("https://hub.test");
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", clientToken);
+        await using var transport = new ModelContextProtocol.Client.HttpClientTransport(new ModelContextProtocol.Client.HttpClientTransportOptions
+        {
+            Endpoint = new Uri("https://hub.test/mcp"),
+            TransportMode = ModelContextProtocol.Client.HttpTransportMode.StreamableHttp
+        }, http, ownsHttpClient: false);
+        await using var mcp = await ModelContextProtocol.Client.McpClient.CreateAsync(transport,
+            new ModelContextProtocol.Client.McpClientOptions { ProtocolVersion = ContextHub.Api.Constants.HubConstants.PROTOCOL_VERSION });
+        Assert.Equal("catalog_search", Assert.Single(await mcp.ListToolsAsync()).Name);
+
+        using var clientAdmin = await http.GetAsync("/api/admin/v1/packages");
+        Assert.Equal(HttpStatusCode.Forbidden, clientAdmin.StatusCode);
+        using var ownerAdmin = await SendBearerAsync(http, HttpMethod.Get, "/api/admin/v1/packages", ownerToken);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, ownerAdmin.StatusCode);
+
+        using var revoke = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/v1/clients/{clientId}/tokens/{tokenId}/revoke");
+        revoke.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ownerToken);
+        using var revoked = await authentication.SendAsync(revoke);
+        Assert.Equal(HttpStatusCode.OK, revoked.StatusCode);
+        var rejected = await Assert.ThrowsAsync<HttpRequestException>(async () => await mcp.ListToolsAsync());
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
     }
 
     /// <summary>
@@ -431,7 +482,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// <param name="client">The isolated host client.</param>
     /// <param name="name">The unique test account name.</param>
     /// <returns>The safe profile from the created response.</returns>
-    private static async Task<JsonElement> RegisterAsync(HttpClient client, string name)
+    internal static async Task<JsonElement> RegisterAsync(HttpClient client, string name)
     {
         using var response = await client.PostAsJsonAsync("/api/admin/v1/users",
             new CreateUserRequestDto(name, name + "@example.test", "Native-test-Password!123"));
@@ -445,7 +496,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// <param name="client">The isolated host client.</param>
     /// <param name="name">The account created for this test.</param>
     /// <returns>The protected browser cookies, never written to diagnostic output.</returns>
-    private static async Task<string> LoginAsync(HttpClient client, string name)
+    internal static async Task<string> LoginAsync(HttpClient client, string name)
     {
         using var page = await client.GetAsync("/login");
         var proof = Antiforgery(await page.Content.ReadAsStringAsync());
@@ -471,7 +522,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// <param name="cookie">The password-authenticated browser session.</param>
     /// <param name="swagger">Whether to exercise the OAuth-only documentation client.</param>
     /// <returns>The code and private verifier used only by this test.</returns>
-    private static async Task<(string Code, string Verifier)> AuthorizeAsync(HttpClient client, string cookie, bool swagger)
+    internal static async Task<(string Code, string Verifier)> AuthorizeAsync(HttpClient client, string cookie, bool swagger)
     {
         var verifier = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
         using var request = new HttpRequestMessage(HttpMethod.Get, AuthorizationUri(verifier, swagger));
@@ -490,7 +541,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// <param name="verifier">The PKCE proof whose challenge is sent to the server.</param>
     /// <param name="swagger">Selects the registered protocol client and callback.</param>
     /// <returns>The authorization endpoint with its required protocol parameters.</returns>
-    private static string AuthorizationUri(string verifier, bool swagger)
+    internal static string AuthorizationUri(string verifier, bool swagger)
     {
         var query = new Dictionary<string, string?>
         {
@@ -518,7 +569,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// <param name="verifier">The corresponding private PKCE proof.</param>
     /// <param name="swagger">Selects the same client and callback used during authorization.</param>
     /// <returns>The native token response without wrapping it in an Admin envelope.</returns>
-    private static async Task<JsonElement> ExchangeAsync(HttpClient client, string code, string verifier, bool swagger)
+    internal static async Task<JsonElement> ExchangeAsync(HttpClient client, string code, string verifier, bool swagger)
     {
         using var response = await client.PostAsync("/connect/token", CodeForm(code, verifier, swagger));
         Assert.True(response.Headers.CacheControl!.NoStore);
@@ -547,7 +598,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// </summary>
     /// <param name="refresh">The rotating native refresh proof.</param>
     /// <returns>The form owned by its HTTP request.</returns>
-    private static FormUrlEncodedContent RefreshForm(string refresh) => new(new Dictionary<string, string>
+    internal static FormUrlEncodedContent RefreshForm(string refresh) => new(new Dictionary<string, string>
     {
         ["grant_type"] = "refresh_token",
         ["client_id"] = AuthenticationConstants.ADMIN_CLIENT,
@@ -560,7 +611,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// <param name="client">The isolated host client.</param>
     /// <param name="cookie">Only the browser session being ended.</param>
     /// <returns>The logout assertions.</returns>
-    private static async Task LogoutAsync(HttpClient client, string cookie)
+    internal static async Task LogoutAsync(HttpClient client, string cookie)
     {
         using var pageRequest = new HttpRequestMessage(HttpMethod.Get, "/logout");
         pageRequest.Headers.Add("Cookie", cookie);
@@ -614,7 +665,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// <param name="response">The completed HTTP response.</param>
     /// <param name="expected">The expected native status.</param>
     /// <returns>A detached JSON value valid after its document is disposed.</returns>
-    private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response, HttpStatusCode expected = HttpStatusCode.OK)
+    internal static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response, HttpStatusCode expected = HttpStatusCode.OK)
     {
         Assert.Equal(expected, response.StatusCode);
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -627,7 +678,7 @@ public sealed class AuthenticationProtocolPostgreSqlTests : IAsyncLifetime
     /// </summary>
     /// <param name="html">The rendered native form.</param>
     /// <returns>The decoded antiforgery value.</returns>
-    private static string Antiforgery(string html)
+    internal static string Antiforgery(string html)
     {
         var match = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(match.Success);

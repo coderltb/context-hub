@@ -5,7 +5,9 @@ namespace ContextHub.Authentication.Application.Commands.Users.ChangePassword;
 /// </summary>
 /// <param name="userService">The native account-operation boundary.</param>
 /// <param name="authService">The shared authenticated-subject accessor.</param>
-public sealed class ChangePasswordCommandHandler(IUserService userService, IAuthService authService)
+public sealed class ChangePasswordCommandHandler(
+    IUserService userService,
+    IAuthService authService)
     : IRequestHandler<ChangePasswordCommand, ApiResponse<UserResponseDto>>
 {
     /// <summary>

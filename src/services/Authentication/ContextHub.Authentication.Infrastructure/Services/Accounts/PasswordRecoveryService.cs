@@ -29,21 +29,30 @@ public sealed class PasswordRecoveryService(
         ForgotPasswordRequestDto request,
         CancellationToken cancellationToken)
     {
-        // Use one normalized, hashed cache identity across browsers; neither the address nor OTP becomes a plaintext cache key.
+        // Share a normalized, hashed recovery key across browsers.
         var normalized = userManager.NormalizeEmail(request.Email.Trim());
-        var cooldown = CacheKey.Create(AuthenticationRecoveryConstants.CACHE_NAMESPACE,
-            AuthenticationRecoveryConstants.KEY_VERSION, AuthenticationRecoveryConstants.COOLDOWN_KEY, normalized);
+        var cooldown = CacheKey.Create(
+            AuthenticationRecoveryConstants.CACHE_NAMESPACE,
+            AuthenticationRecoveryConstants.KEY_VERSION,
+            AuthenticationRecoveryConstants.COOLDOWN_KEY,
+            normalized);
 
         // Reserve the resend cooldown atomically before account lookup or email transport work.
-        if (!await atomicCacheService.TrySetIfAbsentAsync(cooldown.Value, AuthenticationRecoveryConstants.RESERVATION_VALUE,
-            TimeSpan.FromSeconds(AuthenticationRecoveryConstants.SEND_COOLDOWN_SECONDS), cancellationToken))
+        if (!await atomicCacheService.TrySetIfAbsentAsync(
+            cooldown.Value,
+            AuthenticationRecoveryConstants.RESERVATION_VALUE,
+            TimeSpan.FromSeconds(AuthenticationRecoveryConstants.SEND_COOLDOWN_SECONDS),
+            cancellationToken))
         {
             return false;
         }
 
-        // Neither resend nor verification resets these counters; different browsers share the same hashed identity key.
-        var hourly = CacheKey.Create(AuthenticationRecoveryConstants.CACHE_NAMESPACE,
-            AuthenticationRecoveryConstants.KEY_VERSION, AuthenticationRecoveryConstants.SEND_BUDGET_KEY, normalized);
+        // Resend and verification retain the shared attempt counters.
+        var hourly = CacheKey.Create(
+            AuthenticationRecoveryConstants.CACHE_NAMESPACE,
+            AuthenticationRecoveryConstants.KEY_VERSION,
+            AuthenticationRecoveryConstants.SEND_BUDGET_KEY,
+            normalized);
         var sends = await atomicCacheService.IncrementAsync(hourly.Value, TimeSpan.FromHours(1), cancellationToken);
 
         return sends <= AuthenticationRecoveryConstants.MAX_SENDS_PER_HOUR;
@@ -62,8 +71,7 @@ public sealed class PasswordRecoveryService(
         var normalized = userManager.NormalizeEmail(emailAddress.Trim());
 
         // Legacy duplicates, including inactive accounts, must never select an arbitrary recovery identity.
-        if (await userRepository.CountAsync(value => value.NormalizedEmail == normalized,
-            cancellationToken: cancellationToken) != 1)
+        if (await userRepository.CountAsync(value => value.NormalizedEmail == normalized, cancellationToken: cancellationToken) != 1)
         {
             return null;
         }
@@ -104,8 +112,10 @@ public sealed class PasswordRecoveryService(
         // Native email tokens use their own time window; invitation DataProtection lifetime does not govern this code.
         var code = await userManager.GeneratePasswordResetTokenAsync(user);
 
-        // Build the transport payload from native proof; this DTO and its body must never enter request/response diagnostics.
-        var message = new EmailRequestDto(account.Email, AuthenticationRecoveryConstants.EMAIL_SUBJECT,
+        // Keep native proof and mail content out of diagnostics.
+        var message = new EmailRequestDto(
+            account.Email,
+            AuthenticationRecoveryConstants.EMAIL_SUBJECT,
             string.Format(AuthenticationRecoveryConstants.EMAIL_TEXT, code),
             string.Format(AuthenticationRecoveryConstants.EMAIL_HTML, code));
 
@@ -123,35 +133,43 @@ public sealed class PasswordRecoveryService(
         CancellationToken cancellationToken)
     {
         var normalized = userManager.NormalizeEmail(request.Email.Trim());
-        var key = CacheKey.Create(AuthenticationRecoveryConstants.CACHE_NAMESPACE,
-            AuthenticationRecoveryConstants.KEY_VERSION, AuthenticationRecoveryConstants.VERIFY_BUDGET_KEY, normalized);
+        var key = CacheKey.Create(
+            AuthenticationRecoveryConstants.CACHE_NAMESPACE,
+            AuthenticationRecoveryConstants.KEY_VERSION,
+            AuthenticationRecoveryConstants.VERIFY_BUDGET_KEY,
+            normalized);
 
-        // Count every verification attempt before account and OTP lookup, so changing browsers or resending cannot reset the shared budget.
-        var attempts = await atomicCacheService.IncrementAsync(key.Value,
-            TimeSpan.FromMinutes(AuthenticationRecoveryConstants.VERIFICATION_WINDOW_MINUTES), cancellationToken);
+        // Count attempts before lookup; resending cannot reset the shared budget.
+        var attempts = await atomicCacheService.IncrementAsync(
+            key.Value,
+            TimeSpan.FromMinutes(AuthenticationRecoveryConstants.VERIFICATION_WINDOW_MINUTES),
+            cancellationToken);
         if (attempts > AuthenticationRecoveryConstants.MAX_VERIFICATION_ATTEMPTS)
         {
             return null;
         }
 
-        // Resolve only an eligible active Owner with a password; missing and ineligible accounts share the same safe rejection.
+        // Missing and ineligible accounts share the same safe rejection.
         var account = await GetAccountAsync(request.Email, cancellationToken);
         if (account is null)
         {
             return null;
         }
 
-        // Validate the proof with the configured native provider and reset purpose, not a custom OTP comparison.
+        // Verify proof with the configured native reset provider and purpose.
         var user = await userRepository.FirstOrDefaultAsync(
             predicate: value => value.Id == account.UserId && value.IsActive,
             cancellationToken: cancellationToken);
-        if (user is null || !await userManager.VerifyUserTokenAsync(user,
-            userManager.Options.Tokens.PasswordResetTokenProvider, UserManager<User>.ResetPasswordTokenPurpose, request.OtpCode))
+        if (user is null || !await userManager.VerifyUserTokenAsync(
+            user,
+            userManager.Options.Tokens.PasswordResetTokenProvider,
+            UserManager<User>.ResetPasswordTokenPurpose,
+            request.OtpCode))
         {
             return null;
         }
 
-        // Verification does not consume the native OTP; successful password reset changes its security-stamp binding.
+        // Only successful reset changes the OTP security-stamp binding.
         return new(user.Id, request.OtpCode);
     }
 
@@ -167,10 +185,11 @@ public sealed class PasswordRecoveryService(
     {
         try
         {
-            // Keep password reset and grant revocation atomic; any native mutation failure must roll back before returning a form outcome.
-            var outcome = await unitOfWork.ExecuteInTransactionAsync(async token =>
+            // Roll back failed reset or grant revocation before returning a form outcome.
+            var outcome = await unitOfWork.ExecuteInTransactionAsync(
+                async token =>
             {
-                // Recheck current account eligibility inside the write transaction, even when the protected recovery cookie was valid earlier.
+                // Recheck current account eligibility inside the write transaction.
                 var user = await userRepository.FirstOrDefaultAsync(
                     predicate: value => value.Id == request.UserId && value.IsActive,
                     cancellationToken: token);
@@ -184,8 +203,7 @@ public sealed class PasswordRecoveryService(
                 var result = await userManager.ResetPasswordAsync(user, request.Token, request.Password);
                 if (!result.Succeeded)
                 {
-                    var policyRejected = result.Errors.All(error => error.Code.StartsWith(
-                        AuthenticationRecoveryConstants.NATIVE_PASSWORD_ERROR_PREFIX, StringComparison.Ordinal));
+                    var policyRejected = result.Errors.All(error => error.Code.StartsWith(AuthenticationRecoveryConstants.NATIVE_PASSWORD_ERROR_PREFIX, StringComparison.Ordinal));
                     var code = policyRejected ? AuthenticationErrorConstants.PASSWORD_POLICY_REJECTED
                         : AuthenticationErrorConstants.RESET_REJECTED;
                     logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(ResetAsync), code);
@@ -198,9 +216,10 @@ public sealed class PasswordRecoveryService(
                 await sessionService.RevokeAllAsync(user.Id, token);
 
                 return PasswordResetOutcome.Succeeded;
-            }, cancellationToken);
+            },
+                cancellationToken);
 
-            // Record completion only after the transaction commits; the outcome never includes password or OTP material.
+            // Log completion after commit without password or OTP data.
             if (outcome == PasswordResetOutcome.Succeeded)
             {
                 logger.LogInformation(AuthenticationLogConstants.RECOVERY_COMPLETED);

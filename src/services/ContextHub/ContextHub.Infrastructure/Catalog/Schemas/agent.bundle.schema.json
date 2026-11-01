@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "when_to_use", "when_not_to_use", "inputs", "outputs", "instructions", "completion_criteria", "role", "responsibilities", "boundaries", "uses", "handoff"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "when_to_use": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "when_not_to_use": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "inputs": {"$ref": "bundle-common.schema.json#/$defs/inputs"},
+    "outputs": {"$ref": "bundle-common.schema.json#/$defs/outputs"},
+    "instructions": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "completion_criteria": {"$ref": "bundle-common.schema.json#/$defs/textList"},
+    "role": {"$ref": "bundle-common.schema.json#/$defs/text"},
+    "responsibilities": {"$ref": "bundle-common.schema.json#/$defs/textList"},
+    "boundaries": {"$ref": "bundle-common.schema.json#/$defs/textList"},
+    "uses": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"$ref": "bundle-common.schema.json#/$defs/packageId"}},
+    "handoff": {"$ref": "bundle-common.schema.json#/$defs/text"}
+  }
+}

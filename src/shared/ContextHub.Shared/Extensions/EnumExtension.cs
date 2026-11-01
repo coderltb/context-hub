@@ -12,7 +12,9 @@ public static class EnumExtension
     /// <param name="name">The optional member name, with surrounding whitespace allowed.</param>
     /// <param name="value">The declared value on success; otherwise the enum's default value.</param>
     /// <returns>Whether the input names exactly one declared member.</returns>
-    public static bool TryParseDefinedName<TEnum>(string? name, out TEnum value)
+    public static bool TryParseDefinedName<TEnum>(
+        string? name,
+        out TEnum value)
         where TEnum : struct, Enum
     {
         var success = TryParseDefinedName(typeof(TEnum), name, out var parsed);
@@ -28,7 +30,10 @@ public static class EnumExtension
     /// <param name="name">The optional single member name.</param>
     /// <param name="value">The declared enum value on success.</param>
     /// <returns>Whether one declared member was matched.</returns>
-    internal static bool TryParseDefinedName(Type enumType, string? name, out object? value)
+    internal static bool TryParseDefinedName(
+        Type enumType,
+        string? name,
+        out object? value)
     {
         value = null;
         if (!enumType.IsEnum || string.IsNullOrWhiteSpace(name))

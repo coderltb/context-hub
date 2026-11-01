@@ -1,7 +1,6 @@
 global using System.Collections.Immutable;
 global using System.Data;
 
-
 global using System.Diagnostics.CodeAnalysis;
 
 global using System.Linq.Expressions;
@@ -65,7 +64,7 @@ global using ContextHub.Authentication.Infrastructure.Interceptors;
 global using ContextHub.Authentication.Infrastructure.Interfaces.Repositories.Clients;
 global using ContextHub.Authentication.Infrastructure.Interfaces.Repositories.Users;
 global using ContextHub.Authentication.Application.Interfaces.Identity;
-global using ContextHub.Authentication.Infrastructure.Options;
+
 global using ContextHub.Authentication.Infrastructure.Repositories.Clients;
 global using ContextHub.Authentication.Infrastructure.Repositories.Users;
 global using ContextHub.Authentication.Infrastructure.Services.Accounts;
@@ -80,7 +79,7 @@ global using ContextHub.Cache.Models;
 global using ContextHub.Core.DependencyInjection;
 global using ContextHub.Core.Exceptions;
 global using ContextHub.Core.Helpers.Persistence;
-global using ContextHub.Core.Interceptors.Auditing;
+
 global using ContextHub.Core.Interfaces.Auditing;
 global using ContextHub.Core.Interfaces.Caches;
 global using ContextHub.Core.Interfaces.Email;

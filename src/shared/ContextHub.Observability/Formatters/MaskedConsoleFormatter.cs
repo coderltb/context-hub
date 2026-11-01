@@ -29,7 +29,9 @@ public sealed class MaskedConsoleFormatter : ITextFormatter
     /// </summary>
     /// <param name="logEvent">The operational event with a developer-owned template.</param>
     /// <param name="output">The sink output writer.</param>
-    public void Format(LogEvent logEvent, TextWriter output)
+    public void Format(
+        LogEvent logEvent,
+        TextWriter output)
     {
         ArgumentNullException.ThrowIfNull(logEvent);
         ArgumentNullException.ThrowIfNull(output);
@@ -54,12 +56,17 @@ public sealed class MaskedConsoleFormatter : ITextFormatter
         {
             // Exception messages, stacks and Data can contain secrets. Only the exception type is approved metadata.
             properties.RemoveAll(property => property.Name == ObservabilityConstants.EXCEPTION_TYPE);
-            properties.Add(new LogEventProperty(ObservabilityConstants.EXCEPTION_TYPE,
-                new ScalarValue(logEvent.Exception.GetType().Name)));
+            properties.Add(new LogEventProperty(ObservabilityConstants.EXCEPTION_TYPE, new ScalarValue(logEvent.Exception.GetType().Name)));
         }
 
-        return new LogEvent(logEvent.Timestamp, logEvent.Level, null, logEvent.MessageTemplate, properties,
-            logEvent.TraceId ?? default, logEvent.SpanId ?? default);
+        return new LogEvent(
+            logEvent.Timestamp,
+            logEvent.Level,
+            null,
+            logEvent.MessageTemplate,
+            properties,
+            logEvent.TraceId ?? default,
+            logEvent.SpanId ?? default);
     }
 
     /// <summary>
@@ -85,8 +92,7 @@ public sealed class MaskedConsoleFormatter : ITextFormatter
                 new LogEventProperty(property.Name, RedactProperty(property.Name, property.Value)))),
             SequenceValue sequence => new SequenceValue(sequence.Elements.Select(RedactValue)),
             DictionaryValue dictionary => new DictionaryValue(dictionary.Elements.Select(entry =>
-                new KeyValuePair<ScalarValue, LogEventPropertyValue>(entry.Key,
-                    entry.Key.Value is string key ? RedactProperty(key, entry.Value) : RedactValue(entry.Value)))),
+                new KeyValuePair<ScalarValue, LogEventPropertyValue>(entry.Key, entry.Key.Value is string key ? RedactProperty(key, entry.Value) : RedactValue(entry.Value)))),
             // Unknown objects can execute arbitrary ToString code during rendering; do not forward them to a sink.
             ScalarValue { Value: not null } scalar when scalar.Value is not
                     (string or bool or char or byte or sbyte or short or ushort or int or uint or long or ulong

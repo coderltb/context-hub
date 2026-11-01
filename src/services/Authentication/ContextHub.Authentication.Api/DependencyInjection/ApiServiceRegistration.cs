@@ -46,7 +46,8 @@ public static class ApiServiceRegistration
     private static void ConfigureSsoPages(IServiceCollection services)
     {
         services.AddRazorPages(options => options.Conventions.AddFolderRouteModelConvention(
-            SsoPageConstants.ACCOUNT_FOLDER, model =>
+            SsoPageConstants.ACCOUNT_FOLDER,
+            model =>
             {
                 if (!SsoPageConstants.ROUTES.TryGetValue(model.ViewEnginePath, out var route))
                 {
@@ -79,10 +80,13 @@ public static class ApiServiceRegistration
             .ScanExamples(typeof(ApiServiceRegistration).Assembly)
             .ApiErrorResponses()
             .Operation<CreateUserRequestDto, ApiResponse<UserResponseDto>>(
-                StatusCodes.Status201Created, StatusCodes.Status409Conflict));
+                StatusCodes.Status201Created,
+                StatusCodes.Status409Conflict));
 
         // Attach service title/Bearer metadata to the native document without a second schema or example engine.
-        services.Configure<OpenApiOptions>(ApiValueConstants.OPENAPI_DOCUMENT, options =>
+        services.Configure<OpenApiOptions>(
+            ApiValueConstants.OPENAPI_DOCUMENT,
+            options =>
         {
             options.AddDocumentTransformer<AuthenticationDocumentTransformer>();
             options.AddOperationTransformer<AuthenticationDocumentTransformer>();
@@ -98,7 +102,9 @@ public static class ApiServiceRegistration
         // Same-origin Swagger/SSO needs no CORS grant; cross-origin clients need an explicit deployment allowlist.
         services.AddCors();
         services.AddOptions<CorsOptions>().Configure<IOptions<AuthenticationServiceOptions>>((options, configured) =>
-            options.AddPolicy(ApiValueConstants.CORS_POLICY, policy =>
+            options.AddPolicy(
+                ApiValueConstants.CORS_POLICY,
+                policy =>
             {
                 if (configured.Value.CorsOrigins.Length > 0)
                 {

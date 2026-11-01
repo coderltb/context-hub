@@ -16,7 +16,10 @@ public static class CodeGenerationHelper
         ArgumentOutOfRangeException.ThrowIfGreaterThan(length, SharedConstants.CodeVariables.MAX_LENGTH);
 
         // Generate digits directly: converting a random integer to text would lose leading zeroes and bias lengths.
-        return string.Create(length, 0, static (digits, _) =>
+        return string.Create(
+            length,
+            0,
+            static (digits, _) =>
         {
             for (var index = 0; index < digits.Length; index++)
             {
@@ -32,7 +35,10 @@ public static class CodeGenerationHelper
     /// <param name="randomLength">The numeric suffix length from one through thirty-two.</param>
     /// <param name="separator">The separator; null omits it.</param>
     /// <returns>The formatted identifier ready for service-owned uniqueness enforcement.</returns>
-    public static string GenerateCode(string prefix, int randomLength, string? separator = SharedConstants.CodeVariables.SEPARATOR)
+    public static string GenerateCode(
+        string prefix,
+        int randomLength,
+        string? separator = SharedConstants.CodeVariables.SEPARATOR)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(prefix);
 

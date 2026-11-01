@@ -1,7 +1,7 @@
 namespace ContextHub.Backend.Tests.Conventions;
 
 /// <summary>
-/// Guards documentation formatting across shared production code and its tests.
+/// Guards documentation formatting across handwritten production code and its tests.
 /// </summary>
 public sealed class SharedSourceConventionsTests
 {
@@ -138,11 +138,11 @@ public sealed class SharedSourceConventionsTests
     }
 
     /// <summary>
-    /// Locates shared/test sources, or the complete solution when checking cross-project failure handling.
+    /// Locates handwritten solution sources while excluding generated build output.
     /// </summary>
     /// <param name="includeServices">Whether the convention also covers service and host source.</param>
     /// <returns>The relevant source file paths, excluding generated build output.</returns>
-    private static string[] FindSharedSourceFiles(bool includeServices = false)
+    private static string[] FindSharedSourceFiles(bool includeServices = true)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "ContextHub.sln")))

@@ -26,7 +26,10 @@ public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
     /// <param name="clock">The UTC time provider.</param>
     /// <param name="actor">The operation-local actor accessor.</param>
     /// <param name="logger">The safe audit metadata logger.</param>
-    public AuditSaveChangesInterceptor(TimeProvider clock, IAuditActorAccessor actor, ILogger<AuditSaveChangesInterceptor> logger)
+    public AuditSaveChangesInterceptor(
+        TimeProvider clock,
+        IAuditActorAccessor actor,
+        ILogger<AuditSaveChangesInterceptor> logger)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(actor);
@@ -43,7 +46,9 @@ public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
     /// <param name="eventData">The context about to save.</param>
     /// <param name="result">The existing interception result.</param>
     /// <returns>The unchanged interception result.</returns>
-    public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
+    public override InterceptionResult<int> SavingChanges(
+        DbContextEventData eventData,
+        InterceptionResult<int> result)
     {
         Stamp(eventData.Context);
 
@@ -57,7 +62,10 @@ public sealed class AuditSaveChangesInterceptor : SaveChangesInterceptor
     /// <param name="result">The existing interception result.</param>
     /// <param name="cancellationToken">The save cancellation token.</param>
     /// <returns>The unchanged interception result.</returns>
-    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         Stamp(eventData.Context);

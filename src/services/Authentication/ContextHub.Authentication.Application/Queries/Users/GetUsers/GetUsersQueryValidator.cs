@@ -14,7 +14,9 @@ public sealed class GetUsersQueryValidator : AbstractValidator<GetUsersQuery>
             .GreaterThanOrEqualTo(SharedConstants.PaginationVariables.FIRST_PAGE);
 
         RuleFor(query => query.Request.PageSize)
-            .InclusiveBetween(SharedConstants.PaginationVariables.FIRST_PAGE, SharedConstants.PaginationVariables.MAX_PAGE_SIZE);
+            .InclusiveBetween(
+                SharedConstants.PaginationVariables.FIRST_PAGE,
+                SharedConstants.PaginationVariables.MAX_PAGE_SIZE);
 
         // Widen before multiplication so invalid external offsets fail validation before repository/database work.
         RuleFor(query => query.Request.Page)

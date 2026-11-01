@@ -27,8 +27,12 @@ public interface IDapperService
     /// <param name="param">Optional bound parameters, never logged.</param>
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>The buffered mapped rows, available after an owned connection is released.</returns>
-    Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TResult>(string sql,
-        Func<TFirst, TSecond, TResult> map, string splitOn, object? param = null, DapperCommandOptions? options = null);
+    Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TResult>(
+        string sql,
+        Func<TFirst, TSecond, TResult> map,
+        string splitOn,
+        object? param = null,
+        DapperCommandOptions? options = null);
 
     /// <summary>
     /// Splits each buffered SQL row into three objects without automatically grouping one-to-many relationships.
@@ -43,8 +47,12 @@ public interface IDapperService
     /// <param name="param">Optional bound parameters, never logged.</param>
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>The buffered mapped rows, available after an owned connection is released.</returns>
-    Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TThird, TResult>(string sql,
-        Func<TFirst, TSecond, TThird, TResult> map, string splitOn, object? param = null, DapperCommandOptions? options = null);
+    Task<IReadOnlyList<TResult>> QueryAsync<TFirst, TSecond, TThird, TResult>(
+        string sql,
+        Func<TFirst, TSecond, TThird, TResult> map,
+        string splitOn,
+        object? param = null,
+        DapperCommandOptions? options = null);
 
     /// <summary>
     /// Returns the first row, throwing when no row exists.
@@ -114,5 +122,9 @@ public interface IDapperService
     /// <param name="param">The optional bound parameter object; never logged.</param>
     /// <param name="options">Timeout, cancellation and optional caller-owned transaction.</param>
     /// <returns>A task containing the mapped result.</returns>
-    Task<TResult> QueryMultipleAsync<TResult>(string sql, Func<SqlMapper.GridReader, Task<TResult>> map, object? param = null, DapperCommandOptions? options = null);
+    Task<TResult> QueryMultipleAsync<TResult>(
+        string sql,
+        Func<SqlMapper.GridReader, Task<TResult>> map,
+        object? param = null,
+        DapperCommandOptions? options = null);
 }

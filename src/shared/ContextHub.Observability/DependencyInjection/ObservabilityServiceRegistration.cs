@@ -13,7 +13,9 @@ public static class ObservabilityServiceRegistration
     /// <param name="serviceName">The internal service identity.</param>
     /// <returns>The builder used for explicit exporter composition.</returns>
     public static OpenTelemetryBuilder AddTelemetry(
-        this IServiceCollection services, IConfiguration configuration, string serviceName)
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string serviceName)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -29,7 +31,9 @@ public static class ObservabilityServiceRegistration
     /// <param name="services">The host service collection.</param>
     /// <param name="serviceName">The internal service name used as the resource identity.</param>
     /// <returns>The builder on which the host may explicitly configure approved exporters.</returns>
-    public static OpenTelemetryBuilder AddTelemetry(this IServiceCollection services, string serviceName)
+    public static OpenTelemetryBuilder AddTelemetry(
+        this IServiceCollection services,
+        string serviceName)
     {
         return RegisterTelemetry(services, serviceName, new TelemetryOptions());
     }
@@ -56,17 +60,20 @@ public static class ObservabilityServiceRegistration
         // Bind startup console format, level and category overrides from Observability:Logging before constructing this host's logger.
         services.AddOptions<LoggingOptions>()
             .Bind(configuration.GetSection(ObservabilityConstants.LOGGING_SECTION))
-            .Validate(options => Enum.IsDefined(options.ConsoleFormat),
+            .Validate(
+                options => Enum.IsDefined(options.ConsoleFormat),
                 ObservabilityErrorConstants.INVALID_CONSOLE_FORMAT)
             .Validate(options => Enum.IsDefined(options.MinimumLevel), ObservabilityErrorConstants.INVALID_LOG_LEVEL)
-            .Validate(options => options.MinimumLevelOverrides is not null && options.MinimumLevelOverrides.All(pair =>
+            .Validate(
+                options => options.MinimumLevelOverrides is not null && options.MinimumLevelOverrides.All(pair =>
                     !string.IsNullOrWhiteSpace(pair.Key) && Enum.IsDefined(pair.Value)),
                 ObservabilityErrorConstants.INVALID_LOG_LEVEL_OVERRIDES)
             .ValidateOnStart();
 
         // Route framework logging through the one Serilog pipeline instead of keeping duplicate console providers.
         services.AddLogging(builder => builder.ClearProviders());
-        services.AddSerilog((provider, logger) =>
+        services.AddSerilog(
+            (provider, logger) =>
         {
             // Resolve the validated startup settings from DI; native sinks still apply the shared masking formatter.
             var options = provider.GetRequiredService<IOptions<LoggingOptions>>().Value;
@@ -83,14 +90,16 @@ public static class ObservabilityServiceRegistration
             }
 
             // A null stderr threshold keeps every primary event, including Error/Fatal, on stdout.
-            logger.WriteTo.Console(new MaskedConsoleFormatter(options.ConsoleFormat == ConsoleLogFormat.Text),
+            logger.WriteTo.Console(
+                new MaskedConsoleFormatter(options.ConsoleFormat == ConsoleLogFormat.Text),
                 standardErrorFromLevel: null);
             if (options.ConsoleFormat == ConsoleLogFormat.Both)
             {
                 // This second sink is an optional human copy; shippers must ingest application stdout only.
                 logger.WriteTo.Console(new MaskedConsoleFormatter(useText: true), standardErrorFromLevel: LogEventLevel.Verbose);
             }
-        }, preserveStaticLogger: true);
+        },
+            preserveStaticLogger: true);
 
         // No exporter or body capture is registered; deployment owns shipping and no payload is collected.
         return services;
@@ -103,7 +112,10 @@ public static class ObservabilityServiceRegistration
     /// <param name="serviceName">The bounded resource identity.</param>
     /// <param name="options">The startup-only instrumentation settings.</param>
     /// <returns>The native builder; exporters remain an explicit host decision.</returns>
-    private static OpenTelemetryBuilder RegisterTelemetry(IServiceCollection services, string serviceName, TelemetryOptions options)
+    private static OpenTelemetryBuilder RegisterTelemetry(
+        IServiceCollection services,
+        string serviceName,
+        TelemetryOptions options)
     {
         ArgumentNullException.ThrowIfNull(services);
         ValidateServiceName(serviceName);

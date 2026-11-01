@@ -78,7 +78,9 @@ public sealed class JsonSerializerService : IJsonSerializerService
     /// <param name="json">The JSON text to deserialize; null or blank input produces the documented empty result.</param>
     /// <param name="value">The deserialized value on success, or the type's default value on failure.</param>
     /// <returns>True when non-blank JSON is parsed; false when no usable input or a JSON contract error is encountered.</returns>
-    public bool TryDeserialize<T>(string? json, out T? value)
+    public bool TryDeserialize<T>(
+        string? json,
+        out T? value)
     {
         try
         {
@@ -121,7 +123,9 @@ public sealed class JsonSerializerService : IJsonSerializerService
         /// <param name="member">The CLR member whose JSON property contract is being constructed.</param>
         /// <param name="memberSerialization">The native Newtonsoft member-selection policy.</param>
         /// <returns>The native JSON property contract retaining ignore/converter rules.</returns>
-        protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+        protected override JsonProperty CreateProperty(
+            MemberInfo member,
+            MemberSerialization memberSerialization)
         {
             var property = base.CreateProperty(member, memberSerialization);
 

@@ -13,7 +13,10 @@ public static class StringConvertHelper
     /// <param name="value">The converted value, or default on failure.</param>
     /// <param name="provider">The culture policy; defaults to invariant culture.</param>
     /// <returns>Whether conversion succeeded without lossy enum coercion.</returns>
-    public static bool TryConvert<T>(string? source, out T? value, IFormatProvider? provider = null)
+    public static bool TryConvert<T>(
+        string? source,
+        out T? value,
+        IFormatProvider? provider = null)
     {
         value = default;
         var target = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
@@ -47,7 +50,11 @@ public static class StringConvertHelper
         }
         else if (target == typeof(DateTime))
         {
-            if (!DateTime.TryParse(source, provider, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
+            if (!DateTime.TryParse(
+                source,
+                provider,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsed))
             {
                 return false;
             }
@@ -56,7 +63,11 @@ public static class StringConvertHelper
         }
         else if (target == typeof(DateTimeOffset))
         {
-            if (!DateTimeOffset.TryParse(source, provider, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
+            if (!DateTimeOffset.TryParse(
+                source,
+                provider,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsed))
             {
                 return false;
             }

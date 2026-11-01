@@ -81,7 +81,11 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
 
         var result = await query.FirstOrDefaultAsync(cancellationToken);
 
-        _logger.LogDebug(CoreLogConstants.RepositoryLogs.QUERY_COMPLETED, nameof(FirstOrDefaultAsync), typeof(TEntity).Name, result is null ? 0 : 1);
+        _logger.LogDebug(
+            CoreLogConstants.RepositoryLogs.QUERY_COMPLETED,
+            nameof(FirstOrDefaultAsync),
+            typeof(TEntity).Name,
+            result is null ? 0 : 1);
 
         return result;
     }
@@ -97,8 +101,10 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <param name="cancellationToken">Stops the database operation.</param>
     /// <returns>The selected value or the native default(TResult) when no row matches.</returns>
     [OverloadResolutionPriority(-1)]
-    public virtual async Task<TResult?> FirstOrDefaultAsync<TResult>(Expression<Func<TEntity, TResult>> selector,
-        Expression<Func<TEntity, bool>>? predicate = null, QueryOrder<TEntity>? order = null,
+    public virtual async Task<TResult?> FirstOrDefaultAsync<TResult>(
+        Expression<Func<TEntity, TResult>> selector,
+        Expression<Func<TEntity, bool>>? predicate = null,
+        QueryOrder<TEntity>? order = null,
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default)
     {
@@ -109,7 +115,10 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
         // A value-type default does not prove whether a row existed; callers needing that distinction project a nullable value.
         var result = await query.AsNoTracking().Select(selector).FirstOrDefaultAsync(cancellationToken);
 
-        _logger.LogDebug(CoreLogConstants.RepositoryLogs.PROJECTION_COMPLETED, nameof(FirstOrDefaultAsync), typeof(TEntity).Name);
+        _logger.LogDebug(
+            CoreLogConstants.RepositoryLogs.PROJECTION_COMPLETED,
+            nameof(FirstOrDefaultAsync),
+            typeof(TEntity).Name);
 
         return result;
     }
@@ -132,7 +141,10 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
 
         var result = await query.SingleOrDefaultAsync(cancellationToken);
 
-        _logger.LogDebug(CoreLogConstants.RepositoryLogs.QUERY_COMPLETED, nameof(SingleOrDefaultAsync), typeof(TEntity).Name,
+        _logger.LogDebug(
+            CoreLogConstants.RepositoryLogs.QUERY_COMPLETED,
+            nameof(SingleOrDefaultAsync),
+            typeof(TEntity).Name,
             result is null ? 0 : 1);
 
         return result;
@@ -162,7 +174,10 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
 
         var result = await query.AsNoTracking().Select(selector).SingleOrDefaultAsync(cancellationToken);
 
-        _logger.LogDebug(CoreLogConstants.RepositoryLogs.PROJECTION_COMPLETED, nameof(SingleOrDefaultAsync), typeof(TEntity).Name);
+        _logger.LogDebug(
+            CoreLogConstants.RepositoryLogs.PROJECTION_COMPLETED,
+            nameof(SingleOrDefaultAsync),
+            typeof(TEntity).Name);
 
         return result;
     }
@@ -202,10 +217,7 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug(
-            CoreLogConstants.RepositoryLogs.QUERY_STARTED,
-            nameof(GetListAsync),
-            typeof(TEntity).Name);
+        _logger.LogDebug(CoreLogConstants.RepositoryLogs.QUERY_STARTED, nameof(GetListAsync), typeof(TEntity).Name);
 
         // Keep native entity tracking; callers choose when to save edits through the shared Unit of Work.
         var query = CreateQuery(predicate, search, order);
@@ -232,8 +244,10 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <param name="cancellationToken">Stops the database operation.</param>
     /// <returns>The materialized selected values.</returns>
     [OverloadResolutionPriority(-1)]
-    public virtual async Task<IReadOnlyList<TResult>> GetListAsync<TResult>(Expression<Func<TEntity, TResult>> selector,
-        Expression<Func<TEntity, bool>>? predicate = null, QueryOrder<TEntity>? order = null,
+    public virtual async Task<IReadOnlyList<TResult>> GetListAsync<TResult>(
+        Expression<Func<TEntity, TResult>> selector,
+        Expression<Func<TEntity, bool>>? predicate = null,
+        QueryOrder<TEntity>? order = null,
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default)
     {
@@ -244,7 +258,11 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
 
         var result = await query.AsNoTracking().Select(selector).ToListAsync(cancellationToken);
 
-        _logger.LogDebug(CoreLogConstants.RepositoryLogs.QUERY_COMPLETED, nameof(GetListAsync), typeof(TEntity).Name, result.Count);
+        _logger.LogDebug(
+            CoreLogConstants.RepositoryLogs.QUERY_COMPLETED,
+            nameof(GetListAsync),
+            typeof(TEntity).Name,
+            result.Count);
 
         return result;
     }
@@ -261,10 +279,7 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug(
-            CoreLogConstants.RepositoryLogs.QUERY_STARTED,
-            nameof(AnyAsync),
-            typeof(TEntity).Name);
+        _logger.LogDebug(CoreLogConstants.RepositoryLogs.QUERY_STARTED, nameof(AnyAsync), typeof(TEntity).Name);
 
         var query = CreateQuery(predicate, search);
         var exists = await query.AnyAsync(cancellationToken);
@@ -285,7 +300,8 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <param name="search">Optional typed text and field conditions combined with the predicate using AND.</param>
     /// <param name="cancellationToken">Stops the database operation.</param>
     /// <returns>The 64-bit number of matching rows.</returns>
-    public virtual async Task<long> CountAsync(Expression<Func<TEntity, bool>>? predicate = null,
+    public virtual async Task<long> CountAsync(
+        Expression<Func<TEntity, bool>>? predicate = null,
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default)
     {
@@ -332,8 +348,11 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <param name="search">Optional typed text and field conditions combined with the predicate using AND.</param>
     /// <param name="cancellationToken">Stops both database reads.</param>
     /// <returns>The materialized entities and the separately observed matching count.</returns>
-    public virtual Task<PageResponse<TEntity>> GetPageAsync(PageRequest page, QueryOrder<TEntity>? order = null,
-        Expression<Func<TEntity, bool>>? predicate = null, SearchOptions<TEntity>? search = null,
+    public virtual Task<PageResponse<TEntity>> GetPageAsync(
+        PageRequest page,
+        QueryOrder<TEntity>? order = null,
+        Expression<Func<TEntity, bool>>? predicate = null,
+        SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default)
     {
         return GetPageAsync(CreateQuery(predicate, search, order), entity => entity, page, cancellationToken);
@@ -350,8 +369,11 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <param name="search">Optional typed text and field conditions combined with the predicate using AND.</param>
     /// <param name="cancellationToken">Stops both sequential reads.</param>
     /// <returns>The selected items and the count observed before reading them.</returns>
-    public virtual Task<PageResponse<TResult>> GetPageAsync<TResult>(Expression<Func<TEntity, TResult>> selector,
-        PageRequest page, QueryOrder<TEntity>? order = null, Expression<Func<TEntity, bool>>? predicate = null,
+    public virtual Task<PageResponse<TResult>> GetPageAsync<TResult>(
+        Expression<Func<TEntity, TResult>> selector,
+        PageRequest page,
+        QueryOrder<TEntity>? order = null,
+        Expression<Func<TEntity, bool>>? predicate = null,
         SearchOptions<TEntity>? search = null,
         CancellationToken cancellationToken = default)
     {
@@ -370,10 +392,7 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     {
         // Staging must not save: the owning use case commits its entire change set through Unit of Work.
         var entry = await _entities.AddAsync(entity, cancellationToken);
-        _logger.LogDebug(
-            CoreLogConstants.RepositoryLogs.CHANGE_STAGED,
-            nameof(AddAsync),
-            typeof(TEntity).Name);
+        _logger.LogDebug(CoreLogConstants.RepositoryLogs.CHANGE_STAGED, nameof(AddAsync), typeof(TEntity).Name);
 
         return entry.Entity;
     }
@@ -390,10 +409,7 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     {
         // Stage the collection without introducing a second transaction or save boundary.
         await _entities.AddRangeAsync(entities, cancellationToken);
-        _logger.LogDebug(
-            CoreLogConstants.RepositoryLogs.CHANGE_STAGED,
-            nameof(AddRangeAsync),
-            typeof(TEntity).Name);
+        _logger.LogDebug(CoreLogConstants.RepositoryLogs.CHANGE_STAGED, nameof(AddRangeAsync), typeof(TEntity).Name);
     }
 
     /// <summary>
@@ -445,10 +461,8 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <returns>The expression passed to EF without compiling or materializing entities in memory.</returns>
     protected virtual Expression<Func<TEntity, TResult>> CreateProjection<TResult>()
     {
-        // Only this requested mapping is built as a projection; unrelated REST mappings need not translate to SQL.
-        // Mapping failures propagate unchanged rather than falling back to loading and mapping complete entities.
-        return (Expression<Func<TEntity, TResult>>)TypeAdapterConfig.GlobalSettings.CreateMapExpression(
-            new TypeTuple(typeof(TEntity), typeof(TResult)), MapType.Projection);
+        // Project only the requested mapping; translation failures propagate without loading full entities.
+        return (Expression<Func<TEntity, TResult>>)TypeAdapterConfig.GlobalSettings.CreateMapExpression(new TypeTuple(typeof(TEntity), typeof(TResult)), MapType.Projection);
     }
 
     /// <summary>
@@ -461,8 +475,10 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <param name="search">Optional explicitly selected text fields and typed field conditions.</param>
     /// <param name="order">Optional multi-key ordering; null does not introduce an implicit sort.</param>
     /// <returns>The unexecuted persistence query, available only to this repository and its subclasses.</returns>
-    protected virtual IQueryable<TEntity> CreateQuery(Expression<Func<TEntity, bool>>? predicate = null,
-        SearchOptions<TEntity>? search = null, QueryOrder<TEntity>? order = null)
+    protected virtual IQueryable<TEntity> CreateQuery(
+        Expression<Func<TEntity, bool>>? predicate = null,
+        SearchOptions<TEntity>? search = null,
+        QueryOrder<TEntity>? order = null)
     {
         if (search is not null)
         {
@@ -497,8 +513,11 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
     /// <param name="page">The bounded page request.</param>
     /// <param name="cancellationToken">Cancellation passed to both sequential database reads.</param>
     /// <returns>The selected items and the independently observed count.</returns>
-    private async Task<PageResponse<TResult>> GetPageAsync<TResult>(IQueryable<TEntity> query,
-        Expression<Func<TEntity, TResult>> selector, PageRequest page, CancellationToken cancellationToken)
+    private async Task<PageResponse<TResult>> GetPageAsync<TResult>(
+        IQueryable<TEntity> query,
+        Expression<Func<TEntity, TResult>> selector,
+        PageRequest page,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selector);
         ArgumentNullException.ThrowIfNull(page);
@@ -511,15 +530,18 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity>
 
         _logger.LogDebug(CoreLogConstants.RepositoryLogs.QUERY_STARTED, nameof(GetPageAsync), typeof(TEntity).Name);
 
-        // One context cannot execute these reads in parallel. EF removes ordering from the aggregate SQL.
-        // Count and items share one prepared query, but no database snapshot is promised between statements.
+        // Count and items reuse one query sequentially; separate SQL statements do not promise a snapshot.
         var total = await query.LongCountAsync(cancellationToken);
 
         // No implicit key or sort is invented: without an order, page membership is not guaranteed to be stable.
         var items = await query.Skip((int)page.Offset).Take(page.PageSize)
             .Select(selector).ToListAsync(cancellationToken);
 
-        _logger.LogDebug(CoreLogConstants.RepositoryLogs.QUERY_COMPLETED, nameof(GetPageAsync), typeof(TEntity).Name, items.Count);
+        _logger.LogDebug(
+            CoreLogConstants.RepositoryLogs.QUERY_COMPLETED,
+            nameof(GetPageAsync),
+            typeof(TEntity).Name,
+            items.Count);
 
         return new PageResponse<TResult>(items, page, total);
     }

@@ -15,7 +15,9 @@ public sealed class CorrelationIdHandler(
     /// <param name="request">The outbound request.</param>
     /// <param name="cancellationToken">Cancellation from the HTTP caller.</param>
     /// <returns>The downstream transport response.</returns>
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -41,8 +43,7 @@ public sealed class CorrelationIdHandler(
             logger.LogDebug(ApiCommonLogConstants.CorrelationLogs.OUTBOUND_PROPAGATED);
         }
 
-        // Do not invent an unrelated request identifier when executing outside a correlated request.
-        // Cancellation and transport exceptions retain their native semantics.
+        // Keep the original request correlation; preserve native cancellation and transport errors.
         return base.SendAsync(request, cancellationToken);
     }
 }

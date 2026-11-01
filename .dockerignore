@@ -26,6 +26,6 @@
 **/*.pfx
 **/*.p12
 **/.aspnet
-# Authentication builds its own project graph; other hosts and tests are not inputs.
+# Each Dockerfile copies its own project graph; tests are not runtime inputs.
 src/tests
-src/services/ContextHub
+

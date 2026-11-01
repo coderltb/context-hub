@@ -51,6 +51,10 @@ public sealed class RoleService(
     /// <param name="cancellationToken">Cancels cache invalidation.</param>
     /// <returns>The metadata invalidation operation.</returns>
     public ValueTask InvalidateCacheAsync(CancellationToken cancellationToken) =>
-        cacheService.RemoveAsync(CacheKey.Create(AuthenticationRecoveryConstants.ROLES_CACHE_NAMESPACE,
-            AuthenticationRecoveryConstants.KEY_VERSION, AuthenticationRecoveryConstants.ROLES_KEY), cancellationToken);
+        cacheService.RemoveAsync(
+            CacheKey.Create(
+                AuthenticationRecoveryConstants.ROLES_CACHE_NAMESPACE,
+                AuthenticationRecoveryConstants.KEY_VERSION,
+                AuthenticationRecoveryConstants.ROLES_KEY),
+            cancellationToken);
 }

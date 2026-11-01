@@ -41,6 +41,7 @@ public interface ISessionService
     /// <param name="cancellationToken">Cancels revocation.</param>
     /// <returns>The session-family revocation operation.</returns>
     Task RevokeSessionAsync(SessionRevocationModel session, CancellationToken cancellationToken);
+
     /// <summary>
     /// Revokes all server-managed grants and tokens without deleting framework history.
     /// </summary>

@@ -19,7 +19,9 @@ public sealed class AuthorizationBehavior<TRequest, TResponse>(
     /// <param name="next">The next pipeline delegate.</param>
     /// <param name="cancellationToken">Cancels policies and downstream work.</param>
     /// <returns>The authorized handler response.</returns>
-    public async ValueTask<TResponse> Handle(TRequest message, MessageHandlerDelegate<TRequest, TResponse> next,
+    public async ValueTask<TResponse> Handle(
+        TRequest message,
+        MessageHandlerDelegate<TRequest, TResponse> next,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

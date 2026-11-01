@@ -26,7 +26,10 @@ public sealed class AccountService(
         // Keep unavailable accounts indistinguishable at this boundary; only Identity verifies password and lockout state.
         if (user is null || !user.IsActive || !await userManager.IsInRoleAsync(user, AuthenticationConstants.OWNER))
         {
-            logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(LoginAsync), AuthenticationErrorConstants.SIGN_IN_FAILED);
+            logger.LogWarning(
+                AuthenticationLogConstants.OPERATION_REJECTED,
+                nameof(LoginAsync),
+                AuthenticationErrorConstants.SIGN_IN_FAILED);
 
             return false;
         }
@@ -59,9 +62,7 @@ public sealed class AccountService(
         AcceptInvitationRequestDto request,
         CancellationToken cancellationToken)
     {
-        var user = await userRepository.FirstOrDefaultAsync(
-            predicate: value => value.Id == request.UserId,
-            cancellationToken: cancellationToken);
+        var user = await userRepository.FirstOrDefaultAsync(predicate: value => value.Id == request.UserId, cancellationToken: cancellationToken);
 
         // Accept only an active passwordless account with proof from the invitation provider and purpose.
         if (user is null || !user.IsActive || await userManager.HasPasswordAsync(user) ||

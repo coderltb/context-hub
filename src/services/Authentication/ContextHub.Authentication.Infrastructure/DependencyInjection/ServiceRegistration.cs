@@ -46,7 +46,9 @@ public static class ServiceRegistration
     /// </summary>
     /// <param name="services">The service container owning one scoped context and UoW.</param>
     /// <param name="configuration">The host configuration supplying the named database connection.</param>
-    private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
+    private static void AddPersistence(
+        IServiceCollection services,
+        IConfiguration configuration)
     {
         services.AddScoped<UserSaveChangesInterceptor>();
 
@@ -103,9 +105,11 @@ public static class ServiceRegistration
                 if (context.NewPrincipal is { } principal)
                 {
                     // Identity has verified the stamp and rebuilt current roles. Retain only the protected session binding and completed method.
-                    principal.SetClaim(AuthenticationConstants.SESSION_ID,
+                    principal.SetClaim(
+                        AuthenticationConstants.SESSION_ID,
                         context.CurrentPrincipal?.FindFirstValue(AuthenticationConstants.SESSION_ID));
-                    principal.SetClaim(AuthenticationConstants.AUTHENTICATION_METHOD_CLAIM,
+                    principal.SetClaim(
+                        AuthenticationConstants.AUTHENTICATION_METHOD_CLAIM,
                         context.CurrentPrincipal?.FindFirstValue(AuthenticationConstants.AUTHENTICATION_METHOD_CLAIM));
                 }
 
@@ -276,10 +280,14 @@ public static class ServiceRegistration
     /// </summary>
     /// <param name="services">The host container owning clients and feature scopes.</param>
     /// <param name="configuration">External deployment options; no secret is copied into source or diagnostics.</param>
-    private static void AddRecoveryAndEmail(IServiceCollection services, IConfiguration configuration)
+    private static void AddRecoveryAndEmail(
+        IServiceCollection services,
+        IConfiguration configuration)
     {
         // Protect the temporary password-reset proof in a dedicated cookie scheme; it carries no Owner role or Admin grant.
-        services.AddAuthentication().AddCookie(AuthenticationRecoveryConstants.RECOVERY_SCHEME, options =>
+        services.AddAuthentication().AddCookie(
+            AuthenticationRecoveryConstants.RECOVERY_SCHEME,
+            options =>
         {
             options.Cookie.Name = AuthenticationRecoveryConstants.RECOVERY_COOKIE;
             options.Cookie.HttpOnly = true;
@@ -302,7 +310,9 @@ public static class ServiceRegistration
     /// </summary>
     /// <param name="services">The container owning cache and connection lifetimes.</param>
     /// <param name="configuration">The host's cache lifetimes and structured Redis settings.</param>
-    private static void AddCaching(IServiceCollection services, IConfiguration configuration)
+    private static void AddCaching(
+        IServiceCollection services,
+        IConfiguration configuration)
     {
         // Roles stay in L1; recovery budgets use Redis coordination without enabling a distributed payload cache.
         services.AddCache(options => configuration.GetSection(
