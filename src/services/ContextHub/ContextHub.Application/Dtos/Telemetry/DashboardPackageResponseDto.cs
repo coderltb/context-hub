@@ -16,6 +16,11 @@ public sealed record DashboardPackageResponseDto
     public string DisplayName { get; init; } = "";
 
     /// <summary>
+    /// Gets the current catalog kind for the aggregate row.
+    /// </summary>
+    public string PackageType { get; init; } = "";
+
+    /// <summary>
     /// Gets the completed related count.
     /// </summary>
     public long TotalCount { get; init; }

@@ -171,7 +171,80 @@ public sealed class IntegrationPostgreSqlTests : IAsyncLifetime
             await deleteRepository.DeleteAsync(current, current.ConcurrencyVersion, CancellationToken.None);
         }
         await using var verify = CreateContext();
-        Assert.False(await verify.ExternalMcps.AnyAsync());
+        var deleted = await verify.ExternalMcps.AsNoTracking().SingleAsync();
+        Assert.Equal(ExternalMcpStatus.Deleted, deleted.Status);
+        Assert.Equal(connectionId, deleted.Id);
+        Assert.Equal(_actor, deleted.CreatedBy);
+        Assert.Equal(_actor, deleted.UpdatedBy);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(Config(false)), JsonNode.Parse(deleted.Config)));
+    }
+
+    /// <summary>
+    /// Creates separately from updates and retains the original deletion audit under repeated HTTP mutations.
+    /// </summary>
+    /// <returns>The UUID rename, no-upsert and concurrent soft-delete assertions.</returns>
+    [Fact]
+    public async Task ExternalOwnerRoutesUseStableIdsAndRetainDeletionAudit()
+    {
+        await using var app = await McpTransportTests.CreateHostAsync(new McpTransportTests.IntrospectionHandler(),
+            configureServices: services =>
+            {
+                services.Replace(ServiceDescriptor.Singleton(_dataSource));
+                services.RemoveAll<IDistributedCache>();
+            });
+        using var http = app.GetTestClient();
+        http.BaseAddress = new Uri("https://hub.test");
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "owner");
+        const string route = "/api/admin/v1/external-mcps";
+        var config = JsonSerializer.SerializeToElement(new
+        {
+            schemaVersion = 1, url = "https://93.184.216.34/mcp", enabled = false, toolPolicy = new { mode = "all" }
+        });
+        using var created = await http.PostAsJsonAsync(route, new { name = "original", config });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using var createdJson = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        var original = createdJson.RootElement.GetProperty("data");
+        var id = original.GetProperty("connectionId").GetGuid();
+        var path = route + "/" + id;
+        Assert.EndsWith(path, created.Headers.Location!.OriginalString);
+        var update = new { name = "renamed", config, concurrencyToken = original.GetProperty("concurrencyToken").GetString() };
+        using var updated = await http.PutAsJsonAsync(path, update);
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        using var updatedJson = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
+        var current = updatedJson.RootElement.GetProperty("data");
+        Assert.Equal(id, current.GetProperty("connectionId").GetGuid());
+        Assert.Equal("renamed", current.GetProperty("name").GetString());
+        Assert.Equal(original.GetProperty("createdAt").GetDateTimeOffset().ToUnixTimeMilliseconds(), current.GetProperty("createdAt").GetDateTimeOffset().ToUnixTimeMilliseconds());
+        Assert.Equal(HttpStatusCode.Conflict, (await http.PutAsJsonAsync(path, update)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.PutAsJsonAsync(route + "/" + Guid.NewGuid(), update)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await http.PostAsJsonAsync(route, new { name = "renamed", config })).StatusCode);
+
+        async Task<HttpResponseMessage> DeleteAsync()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, path);
+            request.Headers.TryAddWithoutValidation("If-Match", current.GetProperty("concurrencyToken").GetString());
+            return await http.SendAsync(request);
+        }
+        var responses = await Task.WhenAll(DeleteAsync(), DeleteAsync());
+        foreach (var response in responses)
+        {
+            using (response) Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+        await using var verify = CreateContext();
+        var firstDeletion = await verify.ExternalMcps.AsNoTracking().SingleAsync();
+        Assert.Equal(ExternalMcpStatus.Deleted, firstDeletion.Status);
+        Assert.Equal(id, firstDeletion.Id);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(firstDeletion.Config), JsonNode.Parse(config.GetRawText())));
+        using var repeat = await DeleteAsync();
+        Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
+        var repeated = await verify.ExternalMcps.AsNoTracking().SingleAsync();
+        Assert.Equal(firstDeletion.UpdatedAt, repeated.UpdatedAt);
+        Assert.Equal(firstDeletion.UpdatedBy, repeated.UpdatedBy);
+        Assert.Equal(firstDeletion.CreatedAt, repeated.CreatedAt);
+        Assert.Equal(firstDeletion.ConcurrencyVersion, repeated.ConcurrencyVersion);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.PutAsJsonAsync(path, update)).StatusCode);
+        using var list = JsonDocument.Parse(await (await http.GetAsync(route)).Content.ReadAsStringAsync());
+        Assert.Empty(list.RootElement.GetProperty("data").GetProperty("items").EnumerateArray());
     }
 
     /// <summary>

@@ -6,6 +6,14 @@ namespace ContextHub.Infrastructure.Interfaces.Mcp;
 public interface IToolRepository
 {
     /// <summary>
+    /// Reads one stored tool including both schemas, even when it is disabled.
+    /// </summary>
+    /// <param name="toolId">The immutable Owner-facing identity.</param>
+    /// <param name="cancellationToken">Cancels the database read.</param>
+    /// <returns>The current configuration.</returns>
+    Task<Tool?> GetDetailAsync(Guid toolId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Executes the named authoritative persistence operation.
     /// </summary>
     /// <param name="cancellationToken">The approved cancellationToken input.</param>
@@ -32,9 +40,22 @@ public interface IToolRepository
     /// <summary>
     /// Executes the named authoritative persistence operation.
     /// </summary>
-    /// <param name="toolName">The approved toolName input.</param>
+    /// <param name="toolId">The selected registered tool UUID.</param>
     /// <param name="request">The approved request input.</param>
     /// <param name="cancellationToken">The approved cancellationToken input.</param>
     /// <returns>The completed persistence operation or approved projection.</returns>
-    Task<Tool> SaveStateAsync(string toolName, UpdateMcpToolRequestDto request, CancellationToken cancellationToken);
+    Task<Tool> SaveStateAsync(
+        Guid toolId,
+        UpdateMcpToolRequestDto request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Filters and pages Owner metadata before materialization.
+    /// </summary>
+    /// <param name="request">The query, status and bounded page.</param>
+    /// <param name="cancellationToken">Cancels count and item queries.</param>
+    /// <returns>The provider-projected metadata page.</returns>
+    Task<PageResponse<ToolStateModel>> GetPageAsync(
+        GetMcpToolsRequestDto request,
+        CancellationToken cancellationToken);
 }

@@ -10,7 +10,7 @@ public sealed class CreatePackageRequestDtoValidator : AbstractValidator<CreateP
     /// </summary>
     public CreatePackageRequestDtoValidator()
     {
-        RuleFor(value => value.PackageId).NotEmpty().MaximumLength(128).Matches(CatalogConstants.PACKAGE_ID_PATTERN);
+        RuleFor(value => value.Key).NotEmpty().MaximumLength(128).Matches(CatalogConstants.PACKAGE_ID_PATTERN);
 
         RuleFor(value => value.PackageType).Must(value => CatalogConstants.PACKAGE_TYPES.Contains(value));
 

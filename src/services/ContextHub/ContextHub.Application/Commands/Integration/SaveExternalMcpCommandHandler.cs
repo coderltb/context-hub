@@ -16,5 +16,5 @@ public sealed class SaveExternalMcpCommandHandler(IExternalMcpService externalMc
     public async ValueTask<ApiResponse<ExternalMcpResponseDto>> Handle(
         SaveExternalMcpCommand request,
         CancellationToken cancellationToken) =>
-        new(await externalMcpService.SaveAsync(request.Name, request.Request, cancellationToken));
+        new(await externalMcpService.SaveAsync(request.ConnectionId, request.Request, cancellationToken));
 }

@@ -16,7 +16,7 @@ public sealed class UpdateMcpToolCommandHandler(IToolStateService featureService
         UpdateMcpToolCommand request,
         CancellationToken cancellationToken)
     {
-        var result = await featureService.UpdateAsync(request.ToolName, request.Request, cancellationToken);
+        var result = await featureService.UpdateAsync(request.ToolId, request.Request, cancellationToken);
 
         return new(result);
     }

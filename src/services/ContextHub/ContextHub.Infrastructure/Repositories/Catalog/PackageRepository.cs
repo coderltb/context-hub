@@ -22,10 +22,12 @@ public sealed class PackageRepository(
     {
         var order = request.Sort switch
         {
-            "-packageId" => QueryOrder<Package>.By(value => value.Key, true),
-            "displayName" => QueryOrder<Package>.By(value => value.Name).ThenBy(value => value.Key),
-            "-updatedAt" => QueryOrder<Package>.By(value => value.UpdatedAt, true).ThenBy(value => value.Key),
-            _ => QueryOrder<Package>.By(value => value.Key)
+            CatalogConstants.PACKAGE_KEY_DESCENDING_SORT => QueryOrder<Package>.By(value => value.Key, true).ThenBy(value => value.Id),
+            CatalogConstants.PACKAGE_DISPLAY_NAME_SORT => QueryOrder<Package>.By(value => value.Name).ThenBy(value => value.Id),
+            CatalogConstants.UPDATED_AT_DESCENDING_SORT => QueryOrder<Package>.By(
+                value => value.UpdatedAt,
+                true).ThenBy(value => value.Id),
+            _ => QueryOrder<Package>.By(value => value.Key).ThenBy(value => value.Id)
         };
 
         var search = new SearchOptions<Package>

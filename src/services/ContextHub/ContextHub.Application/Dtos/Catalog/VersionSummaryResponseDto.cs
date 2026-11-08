@@ -6,6 +6,16 @@ namespace ContextHub.Application.Dtos.Catalog;
 public sealed record VersionSummaryResponseDto
 {
     /// <summary>
+    /// Gets the owning package UUID.
+    /// </summary>
+    public Guid PackageId { get; init; }
+
+    /// <summary>
+    /// Gets the immutable public package key.
+    /// </summary>
+    public string Key { get; init; } = "";
+
+    /// <summary>
     /// Gets the exact stable release number.
     /// </summary>
     public string Version { get; init; } = "";
@@ -21,7 +31,7 @@ public sealed record VersionSummaryResponseDto
     public string ContentHash { get; init; } = "";
 
     /// <summary>
-    /// Gets the optional non-revoked replacement release.
+    /// Gets the replacement SemVer from the same package.
     /// </summary>
     public string? ReplacementVersion { get; init; }
 

@@ -55,75 +55,97 @@ public sealed class ExternalMcpService(
     }
 
     /// <summary>
-    /// Saves only closed canonical configuration before invalidating rebuildable metadata.
+    /// Creates a distinct connection; uniqueness is enforced by the existing database constraint.
     /// </summary>
-    /// <param name="name">The Owner-only connection label.</param>
-    /// <param name="request">The raw canonical object and expected version.</param>
-    /// <param name="cancellationToken">Cancels endpoint checks, persistence and invalidation.</param>
-    /// <returns>The committed metadata.</returns>
-    public async Task<ExternalMcpResponseDto> SaveAsync(
-        string name,
-        SaveExternalMcpRequestDto request,
+    /// <param name="request">The name and canonical configuration.</param>
+    /// <param name="cancellationToken">Cancels endpoint validation and persistence.</param>
+    /// <returns>The committed connection projection.</returns>
+    public async Task<ExternalMcpResponseDto> CreateAsync(
+        CreateExternalMcpRequestDto request,
         CancellationToken cancellationToken)
     {
         var config = ExternalMcpImportHelper.ReadCanonical(request.Config);
         await ValidateDnsAsync(config.Url, cancellationToken);
-        var current = await connectionRepository.GetByNameAsync(name, cancellationToken);
-        uint? expected = null;
-        if (current is null)
+        var entity = new ExternalMcp
         {
-            if (request.ConcurrencyToken is not null)
-            {
-                throw new BusinessException(IntegrationConstants.CONFLICT, IntegrationConstants.CONFLICT_MESSAGE, BusinessErrorKind.Conflict);
-            }
-        }
-        else
-        {
-            if (!uint.TryParse(request.ConcurrencyToken, NumberStyles.None, CultureInfo.InvariantCulture, out var version))
-            {
-                throw new BusinessException(IntegrationConstants.CONFLICT, IntegrationConstants.CONFLICT_MESSAGE, BusinessErrorKind.Conflict);
-            }
-
-            expected = version;
-        }
-        current ??= new() {
             Id = Guid.CreateVersion7(),
-            Name = name
+            Name = request.Name.Trim(),
+            Config = JsonSerializer.Serialize(config, IntegrationJsonOptions.CANONICAL)
         };
+        var saved = await connectionRepository.SaveAsync(entity, null, cancellationToken);
+
+        return saved.Adapt<ExternalMcpResponseDto>();
+    }
+
+    /// <summary>
+    /// Updates only the existing UUID target; labels never select another record.
+    /// </summary>
+    /// <param name="connectionId">The selected database identity.</param>
+    /// <param name="request">The editable label, configuration and read version.</param>
+    /// <param name="cancellationToken">Cancels validation and persistence.</param>
+    /// <returns>The committed safe Owner projection.</returns>
+    public async Task<ExternalMcpResponseDto> SaveAsync(
+        Guid connectionId,
+        SaveExternalMcpRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var current = await connectionRepository.GetByIdAsync(connectionId, cancellationToken);
+        if (current is null || current.Status == ExternalMcpStatus.Deleted)
+        {
+            throw new BusinessException(
+                IntegrationConstants.NOT_FOUND,
+                IntegrationConstants.MISSING_MESSAGE,
+                BusinessErrorKind.NotFound);
+        }
+        if (!uint.TryParse(
+            request.ConcurrencyToken,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var expected))
+        {
+            throw new BusinessException(
+                IntegrationConstants.CONFLICT,
+                IntegrationConstants.CONFLICT_MESSAGE,
+                BusinessErrorKind.Conflict);
+        }
+        var config = ExternalMcpImportHelper.ReadCanonical(request.Config);
+        await ValidateDnsAsync(config.Url, cancellationToken);
+        current.Name = request.Name.Trim();
         current.Config = JsonSerializer.Serialize(config, IntegrationJsonOptions.CANONICAL);
         var saved = await connectionRepository.SaveAsync(current, expected, cancellationToken);
 
-        // Existing routes also bind this configuration hash and are rejected even before cache invalidation propagates.
+        // Database policy remains authoritative while cache invalidation propagates.
         await cacheService.RemoveAsync(ExternalToolRegistry.SnapshotKey(saved.Id), cancellationToken);
         return saved.Adapt<ExternalMcpResponseDto>();
     }
 
     /// <summary>
-    /// Deletes current authority before invalidating metadata snapshots.
+    /// Retains the first deletion audit and removes current routing authority.
     /// </summary>
-    /// <param name="name">The exact saved label.</param>
-    /// <param name="concurrencyToken">The opaque If-Match version.</param>
-    /// <param name="cancellationToken">Cancels persistence and cache invalidation.</param>
-    /// <returns>The completed deletion result.</returns>
+    /// <param name="connectionId">The selected database identity.</param>
+    /// <param name="concurrencyToken">The last observed write version.</param>
+    /// <param name="cancellationToken">Cancels persistence and invalidation.</param>
+    /// <returns>The retained deletion outcome.</returns>
     public async Task<DeletedIntegrationResponseDto> DeleteAsync(
-        string name,
+        Guid connectionId,
         string concurrencyToken,
         CancellationToken cancellationToken)
     {
-        var current = await connectionRepository.GetByNameAsync(name, cancellationToken)
-            ?? throw new BusinessException(IntegrationConstants.NOT_FOUND, IntegrationConstants.MISSING_MESSAGE, BusinessErrorKind.NotFound);
-        var expected = uint.Parse(concurrencyToken.Trim('"'), CultureInfo.InvariantCulture);
-        await connectionRepository.DeleteAsync(current, expected, cancellationToken);
+        var current = await connectionRepository.GetByIdAsync(connectionId, cancellationToken)
+            ?? throw new BusinessException(
+                IntegrationConstants.NOT_FOUND,
+                IntegrationConstants.MISSING_MESSAGE,
+                BusinessErrorKind.NotFound);
+        if (current.Status != ExternalMcpStatus.Deleted)
+        {
+            var expected = uint.Parse(concurrencyToken.Trim('"'), CultureInfo.InvariantCulture);
+            await connectionRepository.DeleteAsync(current, expected, cancellationToken);
+        }
         await cacheService.RemoveAsync(ExternalToolRegistry.SnapshotKey(current.Id), cancellationToken);
-        return new() { Deleted = true };
+
+        return new() { ConnectionId = current.Id, Status = IntegrationConstants.DELETED, Deleted = true };
     }
 
-    /// <summary>
-    /// Rejects non-public saved destinations before they can become active connection metadata.
-    /// </summary>
-    /// <param name="url">The canonical endpoint.</param>
-    /// <param name="cancellationToken">Cancels DNS resolution.</param>
-    /// <returns>The completed endpoint validation.</returns>
     private static async Task ValidateDnsAsync(
         string url,
         CancellationToken cancellationToken)
@@ -135,11 +157,15 @@ public sealed class ExternalMcpService(
         }
         catch (SocketException exception)
         {
-            throw new DependencyUnavailableException(IntegrationInfrastructureConstants.ENDPOINT_UNAVAILABLE, exception);
+            throw new DependencyUnavailableException(
+                IntegrationInfrastructureConstants.ENDPOINT_UNAVAILABLE,
+                exception);
         }
         if (addresses.Length == 0 || addresses.Any(address => !ExternalEndpointHelper.IsPublicAddress(address)))
         {
-            throw new BusinessException(IntegrationErrorConstants.UNSAFE_ENDPOINT, IntegrationConstants.INVALID_MESSAGE);
+            throw new BusinessException(
+                IntegrationErrorConstants.UNSAFE_ENDPOINT,
+                IntegrationConstants.INVALID_MESSAGE);
         }
     }
 }

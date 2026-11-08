@@ -30,11 +30,8 @@ global using ContextHub.Application.Validators.Catalog;
 global using ContextHub.Application.Constants.Integration;
 global using ContextHub.Application.Extensions.Integration;
 
-
-
 global using ContextHub.Application.Commands.Integration;
 global using ContextHub.Application.Queries.Integration;
-
 
 global using ContextHub.Application.Models.Mcp;
 global using ContextHub.Application.Enums;
@@ -51,3 +48,6 @@ global using ContextHub.Application.Interfaces.Mcp;
 global using ContextHub.Application.Exceptions.Telemetry;
 global using ContextHub.Application.Models.Integration;
 global using ContextHub.Application.Commands.Telemetry;
+
+
+global using Mapster;

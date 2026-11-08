@@ -10,8 +10,8 @@ public sealed class GetPackageVersionQueryValidator : AbstractValidator<GetPacka
     /// </summary>
     public GetPackageVersionQueryValidator()
     {
-        RuleFor(value => value.PackageId).NotEmpty().MaximumLength(128).Matches(CatalogConstants.PACKAGE_ID_PATTERN);
+        RuleFor(value => value.PackageId).NotEmpty();
 
-        RuleFor(value => value.Version).NotEmpty().MaximumLength(64).Matches(CatalogConstants.STABLE_VERSION_PATTERN);
+        RuleFor(value => value.Version).NotEmpty().Matches(CatalogConstants.STABLE_VERSION_PATTERN);
     }
 }

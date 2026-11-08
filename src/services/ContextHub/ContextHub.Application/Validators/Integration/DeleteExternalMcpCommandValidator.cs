@@ -10,7 +10,7 @@ public sealed class DeleteExternalMcpCommandValidator : AbstractValidator<Delete
     /// </summary>
     public DeleteExternalMcpCommandValidator()
     {
-        RuleFor(value => value.Name).NotEmpty().MaximumLength(120);
+        RuleFor(value => value.ConnectionId).NotEmpty();
         RuleFor(value => value.ConcurrencyToken)
             .NotEmpty()
             .Must(value => value is not null && uint.TryParse(value.Trim('"'), out _));

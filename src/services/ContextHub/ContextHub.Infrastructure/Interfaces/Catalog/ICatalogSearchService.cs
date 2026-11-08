@@ -11,7 +11,7 @@ public interface ICatalogSearchService
     /// <param name="request">The bounded query, filters and optional continuation.</param>
     /// <param name="cancellationToken">Cancels inference and the database command.</param>
     /// <returns>The ranked page, its explicit search mode and optional continuation.</returns>
-    Task<CatalogSearchResponseDto> SearchAsync(
+    Task<CatalogSearchResultModel> SearchAsync(
         CatalogSearchRequestDto request,
         CancellationToken cancellationToken);
 

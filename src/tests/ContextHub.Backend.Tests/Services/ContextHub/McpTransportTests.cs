@@ -298,8 +298,8 @@ public sealed class McpTransportTests
     [Theory]
     [InlineData("PUT", "/api/admin/v1/packages/contexthub.review", "{\"displayName\":\"Review\",\"summary\":\"Guidance\",\"concurrencyToken\":\"1\"}")]
     [InlineData("PUT", "/api/admin/v1/repositories/129396d2-20e7-4fb5-a428-eaef8158059c", "{\"repositoryUrl\":\"https://github.com/dotnet/aspnetcore\",\"defaultRef\":\"main\",\"concurrencyToken\":\"1\"}")]
-    [InlineData("PUT", "/api/admin/v1/mcp-tools/catalog_search", "{\"concurrencyToken\":\"1\"}")]
-    [InlineData("POST", "/api/admin/v1/packages/contexthub.review/versions/preview", "{\"version\":\"1.0.0\",\"authoringRepository\":\"main\",\"sourceCommitSha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"sourcePath\":\"rules\",\"manifest\":{}}")]
+    [InlineData("PUT", "/api/admin/v1/mcp-tools/11111111-1111-1111-1111-111111111111", "{\"concurrencyToken\":\"1\"}")]
+    [InlineData("POST", "/api/admin/v1/packages/11111111-1111-1111-1111-111111111111/versions/preview", "{\"version\":\"1.0.0\",\"authoringRepository\":\"main\",\"sourceCommitSha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"sourcePath\":\"rules\",\"manifest\":{}}")]
     public async Task BodyContractFailuresAreRejectedBeforeUseCases(string method, string path, string body)
     {
         await using var app = await CreateHostAsync(new IntrospectionHandler());
@@ -344,15 +344,15 @@ public sealed class McpTransportTests
         using var client = app.GetTestClient();
         client.BaseAddress = new Uri("https://hub.test");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "owner");
-        using var preview = await client.PostAsJsonAsync("/api/admin/v1/packages/contexthub.review/versions/preview",
+        using var preview = await client.PostAsJsonAsync("/api/admin/v1/packages/11111111-1111-1111-1111-111111111111/versions/preview",
             new PublishVersionRequestDto { Version = "1.0.0", AuthoringRepository = "main", SourceCommitSha = new string('a', 40), SourcePath = "rules" });
         Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
         Assert.True(preview.Headers.CacheControl?.NoStore);
 
         using var created = await client.PostAsJsonAsync("/api/admin/v1/packages",
-            new CreatePackageRequestDto { PackageId = "contexthub.review", PackageType = "workflow", DisplayName = "Review", Summary = "Public review guidance." });
+            new CreatePackageRequestDto { Key = "contexthub.review", PackageType = "workflow", DisplayName = "Review", Summary = "Public review guidance." });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        Assert.Equal("/api/admin/v1/packages/contexthub.review", created.Headers.Location!.AbsolutePath);
+        Assert.Equal("/api/admin/v1/packages/11111111-1111-1111-1111-111111111111", created.Headers.Location!.AbsolutePath);
     }
 
     /// <summary>
@@ -373,7 +373,7 @@ public sealed class McpTransportTests
         var paths = document.RootElement.GetProperty("paths");
         var count = paths.EnumerateObject().Where(path => path.Name.StartsWith("/api/admin/v1", StringComparison.Ordinal))
             .Sum(path => path.Value.EnumerateObject().Count(operation => operation.Name is "get" or "post" or "put" or "delete"));
-        Assert.Equal(31, count);
+        Assert.Equal(33, count);
         var package = paths.GetProperty("/api/admin/v1/packages").GetProperty("post");
         Assert.Contains("package", package.GetProperty("summary").GetString()!, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, package.GetProperty("security").GetArrayLength());
@@ -492,7 +492,7 @@ public sealed class McpTransportTests
                 }
                 if (targetMethod.Name == nameof(ICatalogService.CreatePackageAsync))
                 {
-                    return Task.FromResult(new PackageResponseDto { PackageId = "contexthub.review" });
+                    return Task.FromResult(new PackageResponseDto { PackageId = Guid.Parse("11111111-1111-1111-1111-111111111111"), Key = "contexthub.review" });
                 }
             }
 
@@ -517,14 +517,17 @@ public sealed class McpTransportTests
 
     private sealed class ToolStateFixture : IToolStateService
     {
+        public Task<McpToolDetailResponseDto> GetAsync(Guid toolId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<ContextHub.Application.Models.Mcp.McpToolContractModel>> GetContractsAsync(string? name, CancellationToken token) =>
             Task.FromResult<IReadOnlyList<ContextHub.Application.Models.Mcp.McpToolContractModel>>(
                 McpContractFixture.ReadContracts().Where(contract => name == null || contract.Name == name).ToArray());
         public Task<IReadOnlyList<string>> GetEnabledNamesAsync(CancellationToken token) =>
             Task.FromResult<IReadOnlyList<string>>(ToolCatalogConstants.TOOLS.Select(tool => tool.Name).ToArray());
         public Task<bool> IsEnabledAsync(string toolName, CancellationToken token) => Task.FromResult(true);
-        public Task<McpToolsResponseDto> GetListAsync(CancellationToken token) => throw new NotSupportedException();
-        public Task<McpToolResponseDto> UpdateAsync(string name, UpdateMcpToolRequestDto request, CancellationToken token) => throw new NotSupportedException();
+        public Task<PageResponse<McpToolResponseDto>> GetListAsync(GetMcpToolsRequestDto request, CancellationToken token) => throw new NotSupportedException();
+        public Task<McpToolResponseDto> UpdateAsync(Guid id, UpdateMcpToolRequestDto request, CancellationToken token) => throw new NotSupportedException();
     }
 
     private sealed class UsageFixture : IUsageTelemetryService

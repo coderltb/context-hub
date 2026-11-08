@@ -23,12 +23,15 @@ public class ExternalConnectionRepository(
         {
             return await GetListAsync<ExternalMcp>(
                 value => value,
+                predicate: value => value.Status == ExternalMcpStatus.Active,
                 order: QueryOrder<ExternalMcp>.By(value => value.Name).ThenBy(value => value.Id),
                 cancellationToken: cancellationToken);
         }
         catch (Exception exception) when (DatabaseExceptionHelper.IsUnavailable(exception, cancellationToken))
         {
-            throw new DependencyUnavailableException(IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE, exception);
+            throw new DependencyUnavailableException(
+                IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE,
+                exception);
         }
     }
 
@@ -44,11 +47,15 @@ public class ExternalConnectionRepository(
     {
         try
         {
-            return await FirstOrDefaultAsync(predicate: value => value.Name == name, cancellationToken: cancellationToken);
+            return await FirstOrDefaultAsync(
+                predicate: value => value.Name == name,
+                cancellationToken: cancellationToken);
         }
         catch (Exception exception) when (DatabaseExceptionHelper.IsUnavailable(exception, cancellationToken))
         {
-            throw new DependencyUnavailableException(IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE, exception);
+            throw new DependencyUnavailableException(
+                IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE,
+                exception);
         }
     }
 
@@ -68,7 +75,9 @@ public class ExternalConnectionRepository(
         }
         catch (Exception exception) when (DatabaseExceptionHelper.IsUnavailable(exception, cancellationToken))
         {
-            throw new DependencyUnavailableException(IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE, exception);
+            throw new DependencyUnavailableException(
+                IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE,
+                exception);
         }
     }
 
@@ -86,6 +95,12 @@ public class ExternalConnectionRepository(
     {
         if (expectedVersion is { } expected)
         {
+            if (dbContext.Entry(entity).State == EntityState.Detached)
+            {
+                dbContext.Attach(entity);
+                dbContext.Entry(entity).Property(value => value.Name).IsModified = true;
+                dbContext.Entry(entity).Property(value => value.Config).IsModified = true;
+            }
             dbContext.Entry(entity).Property(value => value.ConcurrencyVersion).OriginalValue = expected;
         }
         else
@@ -108,8 +123,13 @@ public class ExternalConnectionRepository(
         uint expectedVersion,
         CancellationToken cancellationToken)
     {
+        if (dbContext.Entry(entity).State == EntityState.Detached)
+        {
+            dbContext.Attach(entity);
+        }
         dbContext.Entry(entity).Property(value => value.ConcurrencyVersion).OriginalValue = expectedVersion;
-        Remove(entity);
+        // Retain configuration and creation audit; native xmin still arbitrates concurrent writes.
+        entity.Status = ExternalMcpStatus.Deleted;
         await SaveChangesAsync(entity, cancellationToken);
     }
 
@@ -130,18 +150,36 @@ public class ExternalConnectionRepository(
         catch (DbUpdateConcurrencyException exception) when (
             exception.Entries.Count == 1 && ReferenceEquals(exception.Entries[0].Entity, entity))
         {
+            if (entity.Status == ExternalMcpStatus.Deleted)
+            {
+                // A competing delete owns its original audit; only an already committed deletion is idempotent.
+                dbContext.Entry(entity).State = EntityState.Detached;
+                var committed = await GetByIdAsync(entity.Id, cancellationToken);
+                if (committed?.Status == ExternalMcpStatus.Deleted)
+                {
+                    return;
+                }
+            }
             logger.LogWarning(IntegrationLogConstants.EXTERNAL_CONFLICT);
-            throw new BusinessException(IntegrationConstants.CONFLICT, IntegrationConstants.CONFLICT_MESSAGE, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                IntegrationConstants.CONFLICT,
+                IntegrationConstants.CONFLICT_MESSAGE,
+                BusinessErrorKind.Conflict);
         }
         catch (DbUpdateException exception) when (
             exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: IntegrationInfrastructureConstants.EXTERNAL_NAME_CONSTRAINT })
         {
             logger.LogWarning(IntegrationLogConstants.EXTERNAL_DUPLICATE);
-            throw new BusinessException(IntegrationConstants.CONFLICT, IntegrationConstants.CONFLICT_MESSAGE, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                IntegrationConstants.CONFLICT,
+                IntegrationConstants.CONFLICT_MESSAGE,
+                BusinessErrorKind.Conflict);
         }
         catch (Exception exception) when (DatabaseExceptionHelper.IsUnavailable(exception, cancellationToken))
         {
-            throw new DependencyUnavailableException(IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE, exception);
+            throw new DependencyUnavailableException(
+                IntegrationInfrastructureConstants.DATABASE_UNAVAILABLE,
+                exception);
         }
     }
 }

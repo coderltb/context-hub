@@ -18,6 +18,6 @@ public sealed class VersionListRequestDtoValidator : AbstractValidator<VersionLi
 
         RuleFor(value => value.Status).Must(value => value == null || CatalogConstants.VERSION_STATUSES.Contains(value));
 
-        RuleFor(value => value.Sort).Must(value => new[] { "version", "-version", "publishedAt", "-publishedAt" }.Contains(value));
+        RuleFor(value => value.Sort).Must(value => CatalogConstants.VERSION_SORTS.Contains(value));
     }
 }

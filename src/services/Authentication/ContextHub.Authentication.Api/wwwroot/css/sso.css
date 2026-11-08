@@ -109,3 +109,23 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .9375rem; over
     h1 { font-size: 1.75rem; }
 }
 
+
+/* Each origin owns its preference; both SSO and Console use the same theme vocabulary. */
+:root[data-theme="light"] {
+    color-scheme: light;
+    --sso-background: #f8fafc;
+    --sso-surface: #ffffff;
+    --sso-input: #ffffff;
+    --sso-input-border: #64748b;
+    --sso-border: #d8e0ea;
+    --sso-text: #17212f;
+    --sso-muted: #566579;
+    --sso-focus: #2563eb;
+    --sso-error: #b91c1c;
+}
+.sso-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.sso-theme { display: flex; align-items: center; gap: .5rem; }
+.sso-theme select { color: var(--sso-text); background: var(--sso-input); padding: .5rem; border: 1px solid var(--sso-input-border); border-radius: .5rem; font: inherit; }
+.sso-secondary { color: var(--sso-text); background: transparent; border-color: var(--sso-input-border); }
+.sso-secondary:hover { background: var(--sso-input); }
+select:focus-visible { outline: 3px solid var(--sso-focus); outline-offset: 3px; }

@@ -10,6 +10,8 @@ public sealed class GetClientsQueryValidator : AbstractValidator<GetClientsQuery
     /// </summary>
     public GetClientsQueryValidator()
     {
+        RuleFor(query => query.Request.Query).MaximumLength(256);
+
         RuleFor(query => query.Request.Page)
             .GreaterThanOrEqualTo(SharedConstants.PaginationVariables.FIRST_PAGE);
 

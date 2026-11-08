@@ -6,6 +6,11 @@ namespace ContextHub.Infrastructure.Models.Mcp;
 public sealed record ToolStateModel
 {
     /// <summary>
+    /// Gets the stable database identity used only by Owner operations.
+    /// </summary>
+    public Guid Id { get; init; }
+
+    /// <summary>
     /// Gets the fixed capability name.
     /// </summary>
     public string Name { get; init; } = "";

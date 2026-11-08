@@ -11,6 +11,42 @@ public sealed class PackageVersionRepository(
     : GenericRepository<PackageVersion>(contextHubDbContext, logger), IPackageVersionRepository
 {
     /// <summary>
+    /// Filters before counting and paging without materializing immutable release content.
+    /// </summary>
+    /// <param name="packageId">The selected package UUID.</param>
+    /// <param name="request">The lifecycle filter and ordering.</param>
+    /// <param name="cancellationToken">Cancels count and page queries.</param>
+    /// <returns>The mapped Owner metadata page.</returns>
+    public Task<PageResponse<VersionSummaryResponseDto>> GetPageAsync(
+        Guid packageId,
+        VersionListRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var descending = request.Sort == CatalogConstants.VERSION_DESCENDING_SORT;
+        var order = request.Sort switch
+        {
+            // PostgreSQL numeric keys preserve X.Y.Z order before LIMIT/OFFSET, including large version components.
+            CatalogConstants.VERSION_SORT or CatalogConstants.VERSION_DESCENDING_SORT => QueryOrder<PackageVersion>
+                .By(value => Convert.ToDecimal(EF.Functions.StringToArray(value.Number, ".")[0]), descending)
+                .ThenBy(
+                    value => Convert.ToDecimal(EF.Functions.StringToArray(value.Number, ".")[1]),
+                    descending)
+                .ThenBy(
+                    value => Convert.ToDecimal(EF.Functions.StringToArray(value.Number, ".")[2]),
+                    descending),
+            _ => QueryOrder<PackageVersion>.By(
+                value => value.PublishedAt,
+                request.Sort != CatalogConstants.PUBLISHED_AT_SORT)
+        };
+
+        return GetPageAsync<VersionSummaryResponseDto>(
+            new PageRequest(request.Page, request.PageSize),
+            order.ThenBy(value => value.Id),
+            predicate: value => value.PackageId == packageId && (request.Status == null || value.Status == request.Status),
+            cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
     /// Reads current release and parent state together for consumer selection.
     /// </summary>
     /// <param name="packageId">The public package identity.</param>
@@ -104,7 +140,9 @@ public sealed class PackageVersionRepository(
         PackageSearchProjectionModel projection,
         CancellationToken cancellationToken)
     {
-        var release = await contextHubDbContext.Versions.FirstAsync(value => value.Id == projection.Id, cancellationToken);
+        var release = await contextHubDbContext.Versions.FirstAsync(
+            value => value.Id == projection.Id,
+            cancellationToken);
 
         // Reject a stale vector update when metadata changed during inference.
         contextHubDbContext.Entry(release).Property(value => value.ConcurrencyVersion).OriginalValue = projection.ConcurrencyVersion;
@@ -112,4 +150,20 @@ public sealed class PackageVersionRepository(
         release.Embedding = projection.Embedding;
         release.EmbeddingModel = projection.EmbeddingModel;
     }
+
+    /// <summary>
+    /// Binds a version UUID to its package UUID before returning a tracked entity.
+    /// </summary>
+    /// <param name="packageId">The selected package identity.</param>
+    /// <param name="version">The selected version identity.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>The matching owned version.</returns>
+    public Task<PackageVersion?> GetTrackedAsync(
+        Guid packageId,
+        string version,
+        CancellationToken cancellationToken) =>
+        contextHubDbContext.Versions.Include(value => value.Package)
+            .FirstOrDefaultAsync(
+                value => value.PackageId == packageId && value.Number == version,
+                cancellationToken);
 }

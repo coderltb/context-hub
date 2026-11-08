@@ -78,14 +78,12 @@ global using ModelContextProtocol.Client;
 global using ModelContextProtocol.Protocol;
 global using Tool = ContextHub.Domain.Entities.Tool;
 
-
 global using ContextHub.Infrastructure.Interfaces.Telemetry;
 global using ContextHub.Cache.DependencyInjection;
 global using ContextHub.Infrastructure.Services.Embedding;
 global using ContextHub.Infrastructure.Options.Embedding;
 global using ContextHub.Infrastructure.DependencyInjection.Integration;
 global using ContextHub.Infrastructure.DependencyInjection.Telemetry;
-
 
 global using StackExchange.Redis;
 global using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -121,3 +119,7 @@ global using ContextHub.Core.Interfaces.Serialization;
 global using ContextHub.Shared.Helpers.Persistence;
 global using ContextHub.Application.Models.Integration;
 global using ContextHub.Application.Policies.Integration;
+
+global using ContextHub.Domain.Enums;
+
+global using ContextHub.Application.Policies.Mcp;

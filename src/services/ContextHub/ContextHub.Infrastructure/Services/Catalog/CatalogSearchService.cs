@@ -6,10 +6,13 @@ namespace ContextHub.Infrastructure.Services.Catalog;
 public sealed class CatalogSearchService : ICatalogSearchService
 {
     private const string SEARCH_SQL = """
-        SELECT * FROM catalog.fn_search_packages_v1(
+        SELECT ranked.*, package."Id" AS "Id"
+        FROM catalog.fn_search_packages_v1(
             @Query, @PackageTypes, @Tags, @Capabilities,
             CAST(@QueryEmbedding AS public.vector), @EmbeddingModel, @VectorDimensions,
-            @Limit, @Offset, @SearchMode, @RankingConfig)
+            @Limit, @Offset, @SearchMode, @RankingConfig) AS ranked
+        JOIN catalog."Package" AS package ON package."Key" = ranked."PackageId"
+        ORDER BY ranked."Rank" DESC, ranked."PackageId" COLLATE "C"
         """;
     private readonly IDapperService _dapperService;
     private readonly IEmbeddingService _embeddingService;
@@ -38,7 +41,7 @@ public sealed class CatalogSearchService : ICatalogSearchService
     /// <param name="request">The bounded query, filters and optional continuation.</param>
     /// <param name="cancellationToken">Cancels inference and the database command.</param>
     /// <returns>The ranked page, its explicit search mode and optional continuation.</returns>
-    public async Task<CatalogSearchResponseDto> SearchAsync(
+    public async Task<CatalogSearchResultModel> SearchAsync(
         CatalogSearchRequestDto request,
         CancellationToken cancellationToken)
     {
@@ -93,11 +96,16 @@ public sealed class CatalogSearchService : ICatalogSearchService
             throw new DependencyUnavailableException(CatalogConstants.DATABASE_UNAVAILABLE, exception);
         }
 
-        var items = rows.Take(request.Limit).Adapt<List<CatalogSearchItemResponseDto>>();
+        var items = rows.Take(request.Limit).Adapt<List<CatalogSearchItemModel>>();
         var nextOffset = offset + request.Limit;
         var nextCursor = rows.Count > request.Limit && nextOffset <= CatalogConstants.MAX_SEARCH_OFFSET
             ? _cursorProtector.Protect(
-                JsonSerializer.Serialize(new CatalogSearchCursorModel(nextOffset, fingerprint, mode, embedding?.Model, CatalogConstants.RANKING_CONFIG)),
+                JsonSerializer.Serialize(new CatalogSearchCursorModel(
+                    nextOffset,
+                    fingerprint,
+                    mode,
+                    embedding?.Model,
+                    CatalogConstants.RANKING_CONFIG)),
                 TimeSpan.FromMinutes(CatalogConstants.CURSOR_LIFETIME_MINUTES))
             : null;
 
@@ -146,7 +154,12 @@ public sealed class CatalogSearchService : ICatalogSearchService
     /// <param name="capabilities">The canonical capability filters.</param>
     /// <param name="limit">The requested page size.</param>
     /// <returns>The search input fingerprint.</returns>
-    private static string Fingerprint(string query, string[] types, string[] tags, string[] capabilities, int limit) =>
+    private static string Fingerprint(
+        string query,
+        string[] types,
+        string[] tags,
+        string[] capabilities,
+        int limit) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
             new { query, types, tags, capabilities, limit })));
 

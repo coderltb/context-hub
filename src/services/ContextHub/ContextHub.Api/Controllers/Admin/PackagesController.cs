@@ -35,7 +35,7 @@ public sealed class PackagesController(IMediator mediator) : BaseApiController(m
     [ProducesResponseType<ApiResponse<PackageResponseDto>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(
-        string packageId,
+        Guid packageId,
         CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(new GetPackageQuery(packageId), cancellationToken);
@@ -72,7 +72,7 @@ public sealed class PackagesController(IMediator mediator) : BaseApiController(m
     [ProducesResponseType<ApiResponse<PackageResponseDto>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(
-        string packageId,
+        Guid packageId,
         [FromBody] UpdatePackageRequestDto request,
         CancellationToken cancellationToken)
     {

@@ -37,7 +37,7 @@ public sealed class CatalogService(
                 return page;
             }
 
-            var keys = page.Items.Select(value => value.PackageId).ToArray();
+            var keys = page.Items.Select(value => value.Key).ToArray();
             var releases = await versionRepository.GetListAsync<PackageVersionNumberModel>(
                 predicate: value => keys.Contains(value.Package.Key) && value.Status == CatalogConstants.PUBLISHED,
                 cancellationToken: cancellationToken);
@@ -47,7 +47,7 @@ public sealed class CatalogService(
                     group => group.Key,
                     group => Latest(group.Select(value => value.Number)),
                     StringComparer.Ordinal);
-            var items = page.Items.Select(value => value with { LatestVersion = latest.GetValueOrDefault(value.PackageId) }).ToArray();
+            var items = page.Items.Select(value => value with { LatestVersion = latest.GetValueOrDefault(value.Key) }).ToArray();
 
             return new(items, new PageRequest(page.Page, page.PageSize), page.TotalCount);
         }
@@ -64,13 +64,13 @@ public sealed class CatalogService(
     /// <param name="cancellationToken">Cancels the metadata reads.</param>
     /// <returns>The current package and optimistic concurrency token.</returns>
     public async Task<PackageResponseDto> GetPackageDetailAsync(
-        string packageId,
+        Guid packageId,
         CancellationToken cancellationToken)
     {
         try
         {
             var package = await packageRepository.FirstOrDefaultAsync<PackageResponseDto>(
-                predicate: value => value.Key == packageId,
+                predicate: value => value.Id == packageId,
                 cancellationToken: cancellationToken)
                 ?? throw new BusinessException(
                     CatalogErrorConstants.NOT_FOUND,
@@ -78,7 +78,7 @@ public sealed class CatalogService(
                     BusinessErrorKind.NotFound);
             var versions = await versionRepository.GetListAsync(
                 value => value.Number,
-                predicate: value => value.Package.Key == packageId && value.Status == CatalogConstants.PUBLISHED,
+                predicate: value => value.PackageId == packageId && value.Status == CatalogConstants.PUBLISHED,
                 cancellationToken: cancellationToken);
 
             return package with { LatestVersion = Latest(versions) };
@@ -134,7 +134,7 @@ public sealed class CatalogService(
     /// <param name="cancellationToken">Cancels the read and save.</param>
     /// <returns>The saved package state.</returns>
     public async Task<PackageResponseDto> UpdatePackageAsync(
-        string packageId,
+        Guid packageId,
         UpdatePackageRequestDto request,
         CancellationToken cancellationToken)
     {
@@ -149,7 +149,7 @@ public sealed class CatalogService(
             var projections = new List<PackageSearchProjectionModel>();
             if (refreshSearch)
             {
-                var releases = await versionRepository.GetCandidatesAsync(packageId, cancellationToken);
+                var releases = await versionRepository.GetCandidatesAsync(entity.Key, cancellationToken);
                 foreach (var release in releases)
                 {
                     var passage = CatalogContentValidator.CreateSearchText(
@@ -157,7 +157,12 @@ public sealed class CatalogService(
                         JsonNode.Parse(release.Manifest)!.AsObject(),
                         JsonNode.Parse(release.Bundle)!.AsObject());
                     var embedding = await searchService.EncodePassageAsync(passage, cancellationToken);
-                    projections.Add(new(release.Id, release.ConcurrencyVersion, passage, embedding?.Values, embedding?.Model));
+                    projections.Add(new(
+                        release.Id,
+                        release.ConcurrencyVersion,
+                        passage,
+                        embedding?.Values,
+                        embedding?.Model));
                 }
             }
 
@@ -167,7 +172,7 @@ public sealed class CatalogService(
                     async token =>
                 {
                     var current = await packageRepository.FirstOrDefaultAsync<PackagePublicationStateModel>(
-                        predicate: value => value.Key == packageId,
+                        predicate: value => value.Id == packageId,
                         cancellationToken: token)
                         ?? throw new BusinessException(
                             CatalogErrorConstants.NOT_FOUND,
@@ -177,7 +182,9 @@ public sealed class CatalogService(
                     if (refreshSearch)
                     {
                         // The predicate read also protects a concurrent release insert under native Serializable isolation.
-                        var currentReleases = await versionRepository.GetSelectionCandidatesAsync(packageId, token);
+                        var currentReleases = await versionRepository.GetSelectionCandidatesAsync(
+                            entity.Key,
+                            token);
                         var prepared = projections.ToDictionary(value => value.Id);
                         if (currentReleases.Count != prepared.Count || currentReleases.Any(value =>
                             !prepared.TryGetValue(value.Id, out var projection) || projection.ConcurrencyVersion != value.ConcurrencyVersion))
@@ -226,33 +233,19 @@ public sealed class CatalogService(
     /// <summary>
     /// Gets release metadata ordered by semantic version or publication time as requested.
     /// </summary>
-    /// <param name="packageId">The owning public package identity.</param>
+    /// <param name="packageId">The owning package UUID for this Admin operation.</param>
     /// <param name="request">The validated lifecycle filter and page.</param>
     /// <param name="cancellationToken">Cancels the metadata query.</param>
     /// <returns>The administrative release page.</returns>
     public async Task<PageResponse<VersionSummaryResponseDto>> GetVersionsAsync(
-        string packageId,
+        Guid packageId,
         VersionListRequestDto request,
         CancellationToken cancellationToken)
     {
         try
         {
             await GetPackageEntityAsync(packageId, cancellationToken);
-            // Project only metadata; semantic comparison does not require loading immutable manifests or bundles.
-            var versions = await versionRepository.GetListAsync<VersionSummaryResponseDto>(
-                predicate: value => value.Package.Key == packageId && (request.Status == null || value.Status == request.Status),
-                cancellationToken: cancellationToken);
-            var ordered = request.Sort switch
-            {
-                CatalogConstants.VERSION_SORT => versions.OrderBy(value => value.Version, Comparer<string>.Create(CatalogVersionHelper.Compare)),
-                CatalogConstants.VERSION_DESCENDING_SORT => versions.OrderByDescending(value => value.Version, Comparer<string>.Create(CatalogVersionHelper.Compare)),
-                CatalogConstants.PUBLISHED_AT_SORT => versions.OrderBy(value => value.PublishedAt).ThenBy(value => value.Version, StringComparer.Ordinal),
-                _ => versions.OrderByDescending(value => value.PublishedAt).ThenBy(value => value.Version, StringComparer.Ordinal)
-            };
-            var page = new PageRequest(request.Page, request.PageSize);
-            var items = ordered.Skip((int)page.Offset).Take(page.PageSize).ToArray();
-
-            return new(items, page, versions.Count);
+            return await versionRepository.GetPageAsync(packageId, request, cancellationToken);
         }
         catch (Exception exception) when (DatabaseExceptionHelper.IsUnavailable(exception, cancellationToken))
         {
@@ -263,22 +256,33 @@ public sealed class CatalogService(
     /// <summary>
     /// Returns Owner-only immutable content and its current lifecycle metadata.
     /// </summary>
-    /// <param name="packageId">The public package identity.</param>
+    /// <param name="packageId">The owning package UUID.</param>
     /// <param name="version">The exact stable release.</param>
     /// <param name="cancellationToken">Cancels the authoritative query.</param>
     /// <returns>The complete approved Owner detail.</returns>
     public async Task<VersionResponseDto> GetVersionAsync(
-        string packageId,
+        Guid packageId,
         string version,
         CancellationToken cancellationToken)
     {
         try
         {
-            return (await versionRepository.GetTrackedAsync(packageId, version, cancellationToken)
+            var release = await versionRepository.GetTrackedAsync(packageId, version, cancellationToken)
                 ?? throw new BusinessException(
                     CatalogErrorConstants.NOT_FOUND,
                     CatalogErrorConstants.VERSION_NOT_FOUND_MESSAGE,
-                    BusinessErrorKind.NotFound)).Adapt<VersionResponseDto>();
+                    BusinessErrorKind.NotFound);
+
+            var package = await GetPackageEntityAsync(packageId, cancellationToken);
+
+            return release.Adapt<VersionResponseDto>() with
+            {
+                PublicPreview = CreatePublicPreview(
+                    package,
+                    release.Number,
+                    JsonNode.Parse(release.Manifest)!.AsObject(),
+                    JsonNode.Parse(release.Bundle)!.AsObject())
+            };
         }
         catch (Exception exception) when (DatabaseExceptionHelper.IsUnavailable(exception, cancellationToken))
         {
@@ -294,7 +298,7 @@ public sealed class CatalogService(
     /// <param name="cancellationToken">Cancels source and baseline reads.</param>
     /// <returns>A completed preview, including blocked candidates.</returns>
     public async Task<PackagePreviewResponseDto> PreviewAsync(
-        string packageId,
+        Guid packageId,
         PublishVersionRequestDto request,
         CancellationToken cancellationToken)
     {
@@ -306,7 +310,9 @@ public sealed class CatalogService(
             {
                 try
                 {
-                    await resolverService.ValidateCandidateAsync(Candidate(package, request, content), cancellationToken);
+                    await resolverService.ValidateCandidateAsync(
+                        Candidate(package, request, content),
+                        cancellationToken);
                 }
                 catch (BusinessException exception) when (exception.ErrorCode is CatalogErrorConstants.DEPENDENCY_CYCLE or
                     CatalogErrorConstants.DEPENDENCY_CONFLICT or CatalogErrorConstants.DEPENDENCY_MISSING or CatalogErrorConstants.NOT_FOUND or CatalogErrorConstants.PACKAGE_INACTIVE or CatalogErrorConstants.PACKAGE_REVOKED)
@@ -322,11 +328,18 @@ public sealed class CatalogService(
                 }
             }
 
-            var versions = await versionRepository.GetSelectionCandidatesAsync(packageId, cancellationToken);
+            var versions = await versionRepository.GetSelectionCandidatesAsync(
+                package.Key,
+                cancellationToken);
             var baseline = versions.Where(value => CatalogVersionHelper.IsStable(value.Number) &&
                 CatalogVersionHelper.Compare(value.Number, request.Version) < 0)
-                .OrderByDescending(value => value.Number, Comparer<string>.Create(CatalogVersionHelper.Compare)).FirstOrDefault();
-            var baselineContent = baseline is null ? null : await versionRepository.GetImmutableContentAsync(baseline.Id, baseline.ContentHash, cancellationToken);
+                .OrderByDescending(
+                    value => value.Number,
+                    Comparer<string>.Create(CatalogVersionHelper.Compare)).FirstOrDefault();
+            var baselineContent = baseline is null ? null : await versionRepository.GetImmutableContentAsync(
+                baseline.Id,
+                baseline.ContentHash,
+                cancellationToken);
             var changes = CatalogPreviewPolicy.DescribeChanges(
                 baselineContent is null ? null : JsonNode.Parse(baselineContent.Manifest)!.AsObject(),
                 baselineContent is null ? null : JsonNode.Parse(baselineContent.Bundle)!.AsObject(),
@@ -358,20 +371,7 @@ public sealed class CatalogService(
                     Findings = findings,
                     CandidateContentHash = content.ContentHash
                 },
-                PublicPreview = !content.IsValid ? null : new PackagePublicPreviewResponseDto
-                {
-                    PackageId = packageId,
-                    PackageType = package.Type,
-                    Version = request.Version,
-                    Name = package.Name,
-                    Summary = package.Summary,
-                    Tags = content.Manifest["tags"]?.DeepClone(),
-                    Capabilities = content.Manifest["capabilities"]?.DeepClone(),
-                    RequiredCapabilities = content.Manifest["required_capabilities"]?.DeepClone(),
-                    Dependencies = content.Manifest!["dependencies"]?.DeepClone(),
-                    ConflictsWith = content.Manifest["conflicts_with"]?.DeepClone(),
-                    Bundle = content.Bundle.DeepClone().AsObject()
-                }
+                PublicPreview = !content.IsValid ? null : CreatePublicPreview(package, request.Version, content.Manifest, content.Bundle)
             };
         }
         catch (Exception exception) when (DatabaseExceptionHelper.IsUnavailable(exception, cancellationToken))
@@ -388,7 +388,7 @@ public sealed class CatalogService(
     /// <param name="cancellationToken">Cancels source reads, inference and transaction work.</param>
     /// <returns>The saved release or an identical previously published release.</returns>
     public async Task<VersionResponseDto> PublishAsync(
-        string packageId,
+        Guid packageId,
         PublishVersionRequestDto request,
         CancellationToken cancellationToken)
     {
@@ -414,7 +414,7 @@ public sealed class CatalogService(
                 {
                     // A tracked preparation entity may be stale; project fresh database state inside the write transaction.
                     var current = await packageRepository.FirstOrDefaultAsync<PackagePublicationStateModel>(
-                        predicate: value => value.Key == packageId,
+                        predicate: value => value.Id == packageId,
                         cancellationToken: token)
                         ?? throw new BusinessException(
                             CatalogErrorConstants.NOT_FOUND,
@@ -422,7 +422,9 @@ public sealed class CatalogService(
                             BusinessErrorKind.NotFound);
                     if (!current.IsActive)
                     {
-                        throw new BusinessException(CatalogErrorConstants.PACKAGE_INACTIVE, CatalogErrorConstants.PACKAGE_INACTIVE_MESSAGE);
+                        throw new BusinessException(
+                            CatalogErrorConstants.PACKAGE_INACTIVE,
+                            CatalogErrorConstants.PACKAGE_INACTIVE_MESSAGE);
                     }
 
                     if (current.ConcurrencyVersion != package.ConcurrencyVersion)
@@ -433,7 +435,10 @@ public sealed class CatalogService(
                             BusinessErrorKind.Conflict);
                     }
 
-                    var existing = await versionRepository.GetTrackedAsync(packageId, request.Version, token);
+                    var existing = await versionRepository.GetTrackedAsync(
+                        package.Key,
+                        request.Version,
+                        token);
                     if (existing is not null)
                     {
                         EnsureIdentical(existing, candidate);
@@ -459,7 +464,7 @@ public sealed class CatalogService(
             {
                 // An identical committed publication remains idempotent after the failed owned transaction rolled back.
                 versionRepository.DetachFailedInsert(candidate);
-                var existing = (await versionRepository.GetCandidatesAsync(packageId, cancellationToken))
+                var existing = (await versionRepository.GetCandidatesAsync(package.Key, cancellationToken))
                     .SingleOrDefault(value => value.Number == request.Version);
                 if (existing is null)
                 {
@@ -482,13 +487,13 @@ public sealed class CatalogService(
     /// <summary>
     /// Marks a release deprecated without changing its immutable source content.
     /// </summary>
-    /// <param name="packageId">The owning public package identity.</param>
+    /// <param name="packageId">The owning package UUID for this Admin operation.</param>
     /// <param name="version">The exact target release.</param>
     /// <param name="request">The replacement hint and concurrency token.</param>
     /// <param name="cancellationToken">Cancels the owned transaction.</param>
     /// <returns>The saved lifecycle metadata.</returns>
     public Task<VersionResponseDto> DeprecateAsync(
-        string packageId,
+        Guid packageId,
         string version,
         LifecycleVersionRequestDto request,
         CancellationToken cancellationToken) =>
@@ -497,13 +502,13 @@ public sealed class CatalogService(
     /// <summary>
     /// Permanently revokes a release while retaining its immutable publication evidence.
     /// </summary>
-    /// <param name="packageId">The owning public package identity.</param>
+    /// <param name="packageId">The owning package UUID for this Admin operation.</param>
     /// <param name="version">The exact target release.</param>
     /// <param name="request">The replacement hint and concurrency token.</param>
     /// <param name="cancellationToken">Cancels the owned transaction.</param>
     /// <returns>The terminal lifecycle metadata.</returns>
     public Task<VersionResponseDto> RevokeAsync(
-        string packageId,
+        Guid packageId,
         string version,
         LifecycleVersionRequestDto request,
         CancellationToken cancellationToken) =>
@@ -515,7 +520,7 @@ public sealed class CatalogService(
     /// <param name="request">The request-only query and filters.</param>
     /// <param name="cancellationToken">Cancels bounded inference and SQL.</param>
     /// <returns>The ranked result page.</returns>
-    public Task<CatalogSearchResponseDto> SearchAsync(
+    public Task<CatalogSearchResultModel> SearchAsync(
         CatalogSearchRequestDto request,
         CancellationToken cancellationToken) =>
         searchService.SearchAsync(request, cancellationToken);
@@ -537,7 +542,9 @@ public sealed class CatalogService(
     /// <param name="request">The root release selector.</param>
     /// <param name="cancellationToken">Cancels the authority read.</param>
     /// <returns>The complete bounded dependency closure.</returns>
-    public Task<JsonObject> ResolveAsync(PackageLookupRequestDto request, CancellationToken cancellationToken) =>
+    public Task<JsonObject> ResolveAsync(
+        PackageLookupRequestDto request,
+        CancellationToken cancellationToken) =>
         resolverService.ResolveAsync(request, cancellationToken);
 
     /// <summary>
@@ -557,7 +564,9 @@ public sealed class CatalogService(
     /// <param name="request">The selected public release.</param>
     /// <param name="cancellationToken">Cancels the authority read.</param>
     /// <returns>The lifecycle check result.</returns>
-    public Task<JsonObject> GetRevocationsAsync(RevocationRequestDto request, CancellationToken cancellationToken) =>
+    public Task<JsonObject> GetRevocationsAsync(
+        RevocationRequestDto request,
+        CancellationToken cancellationToken) =>
         resolverService.CheckRevocationAsync(request, cancellationToken);
 
     /// <summary>
@@ -620,7 +629,9 @@ public sealed class CatalogService(
                 cancellationToken: cancellationToken);
             var selected = rows.Where(value => CatalogVersionHelper.IsStable(value.Version))
                 .GroupBy(value => value.PackageId, StringComparer.Ordinal)
-                .Select(group => group.OrderByDescending(value => value.Version, Comparer<string>.Create(CatalogVersionHelper.Compare)).First())
+                .Select(group => group.OrderByDescending(
+                    value => value.Version,
+                    Comparer<string>.Create(CatalogVersionHelper.Compare)).First())
                 .OrderBy(value => value.PackageId, StringComparer.Ordinal);
 
             var result = JsonSerializer.SerializeToNode(selected, SnakeCaseOptions)!.AsArray();
@@ -643,18 +654,20 @@ public sealed class CatalogService(
     /// <param name="cancellationToken">Cancels package and source reads.</param>
     /// <returns>The current package and validated immutable content.</returns>
     private async Task<(Package Package, ValidatedPackageModel Content)> PrepareAsync(
-        string packageId,
+        Guid packageId,
         PublishVersionRequestDto request,
         CancellationToken cancellationToken)
     {
         var package = await GetPackageEntityAsync(packageId, cancellationToken);
         if (!package.IsActive)
         {
-            throw new BusinessException(CatalogErrorConstants.PACKAGE_INACTIVE, CatalogErrorConstants.PACKAGE_INACTIVE_MESSAGE);
+            throw new BusinessException(
+                CatalogErrorConstants.PACKAGE_INACTIVE,
+                CatalogErrorConstants.PACKAGE_INACTIVE_MESSAGE);
         }
 
         var source = await sourceReader.ReadAsync(
-            new(packageId, request.AuthoringRepository, request.SourceCommitSha, request.SourcePath),
+            new(package.Key, request.AuthoringRepository, request.SourceCommitSha, request.SourcePath),
             cancellationToken);
         // PostgreSQL stores microseconds; the manifest and scalar publication time must survive the same round trip.
         var publishedAt = DateTimeOffset.UtcNow;
@@ -666,14 +679,14 @@ public sealed class CatalogService(
     /// <summary>
     /// Applies a concurrency-controlled lifecycle change without editing immutable content.
     /// </summary>
-    /// <param name="packageId">The public package identity.</param>
+    /// <param name="packageId">The owning package UUID.</param>
     /// <param name="version">The exact release to update.</param>
     /// <param name="request">The expected version and optional replacement.</param>
     /// <param name="status">The approved target lifecycle state.</param>
     /// <param name="cancellationToken">Cancels live reads and the owned write transaction.</param>
     /// <returns>The committed release projection.</returns>
     private async Task<VersionResponseDto> ChangeLifecycleAsync(
-        string packageId,
+        Guid packageId,
         string version,
         LifecycleVersionRequestDto request,
         string status,
@@ -693,29 +706,34 @@ public sealed class CatalogService(
                 EnsureVersion(release.ConcurrencyVersion, request.ConcurrencyToken);
                 if (release.Status == CatalogConstants.REVOKED)
                 {
-                    throw new BusinessException(CatalogErrorConstants.LIFECYCLE_CONFLICT, "Revocation is terminal.", BusinessErrorKind.Conflict);
+                    throw new BusinessException(
+                        CatalogErrorConstants.LIFECYCLE_CONFLICT,
+                        "Revocation is terminal.",
+                        BusinessErrorKind.Conflict);
                 }
 
+                string? replacementNumber = null;
                 if (request.ReplacementVersion is { } replacement)
                 {
                     var target = await versionRepository.GetTrackedAsync(packageId, replacement, token);
-                    if (replacement == version || target is null || target.Status == CatalogConstants.REVOKED)
+                    if (replacement == version || target is null || target.Status != CatalogConstants.PUBLISHED)
                     {
                         throw new BusinessException(
                             CatalogErrorConstants.INVALID_REPLACEMENT,
-                            "The replacement must be another existing non-revoked release.");
+                            "The replacement must be another published version of this package.");
                     }
+                    replacementNumber = target.Number;
                 }
 
                 release.Status = status;
-                release.ReplacementVersion = request.ReplacementVersion;
+                release.ReplacementVersion = replacementNumber;
                 return release;
             },
                 cancellationToken);
         }
         catch (DbUpdateConcurrencyException exception) when (exception.Entries.Count == 1 &&
             exception.Entries[0].Entity is PackageVersion release &&
-            release.Package.Key == packageId && release.Number == version)
+            release.PackageId == packageId && release.Number == version)
         {
             // Translate only the requested lifecycle write after the owned transaction has rolled back.
             throw new BusinessException(
@@ -737,8 +755,10 @@ public sealed class CatalogService(
     /// <param name="packageId">The exact public package identity.</param>
     /// <param name="cancellationToken">Cancels the authoritative read.</param>
     /// <returns>The tracked package, or a declared missing-package failure.</returns>
-    private async Task<Package> GetPackageEntityAsync(string packageId, CancellationToken cancellationToken) =>
-        await packageRepository.FirstOrDefaultAsync(predicate: value => value.Key == packageId, cancellationToken: cancellationToken)
+    private async Task<Package> GetPackageEntityAsync(Guid packageId, CancellationToken cancellationToken) =>
+        await packageRepository.FirstOrDefaultAsync(
+            predicate: value => value.Id == packageId,
+            cancellationToken: cancellationToken)
         ?? throw new BusinessException(
             CatalogErrorConstants.NOT_FOUND,
             CatalogErrorConstants.PACKAGE_NOT_FOUND_MESSAGE,
@@ -815,4 +835,31 @@ public sealed class CatalogService(
             PublishedAt = content.Manifest["published_at"]!.GetValue<DateTimeOffset>()
         };
 
+    /// <summary>
+    /// Reuses the public allowlist for candidate previews and stored version details.
+    /// </summary>
+    /// <param name="package">The current catalog metadata.</param>
+    /// <param name="version">The exact release number.</param>
+    /// <param name="manifest">The immutable source manifest.</param>
+    /// <param name="bundle">The validated public guidance.</param>
+    /// <returns>The consumer-safe preview without Owner provenance.</returns>
+    private static PackagePublicPreviewResponseDto CreatePublicPreview(
+        Package package,
+        string version,
+        JsonObject manifest,
+        JsonObject bundle) =>
+        new()
+        {
+            PackageId = package.Key,
+            PackageType = package.Type,
+            Version = version,
+            Name = package.Name,
+            Summary = package.Summary,
+            Tags = manifest["tags"]?.DeepClone(),
+            Capabilities = manifest["capabilities"]?.DeepClone(),
+            RequiredCapabilities = manifest["required_capabilities"]?.DeepClone(),
+            Dependencies = manifest["dependencies"]?.DeepClone(),
+            ConflictsWith = manifest["conflicts_with"]?.DeepClone(),
+            Bundle = bundle.DeepClone().AsObject()
+        };
 }

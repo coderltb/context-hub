@@ -32,6 +32,7 @@ public sealed class IdentityMapping : IRegister
 
         config.NewConfig<User, UserResponseDto>()
             .Map(value => value.Roles, _ => Array.Empty<string>())
+            .Map(value => value.RoleIds, _ => Array.Empty<Guid>())
             .Map(value => value.ConcurrencyToken, value => value.ConcurrencyStamp ?? "")
             .Map(value => value.UserName, value => value.UserName ?? "");
     }

@@ -6,6 +6,11 @@ namespace ContextHub.Application.Dtos.Integration;
 public sealed class SaveExternalMcpRequestDto
 {
     /// <summary>
+    /// Gets the editable connection label; UUID remains the write target.
+    /// </summary>
+    public string Name { get; init; } = "";
+
+    /// <summary>
     /// Gets the closed canonical connection configuration.
     /// </summary>
     public JsonElement Config { get; init; }

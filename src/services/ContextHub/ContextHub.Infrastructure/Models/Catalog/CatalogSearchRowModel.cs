@@ -6,6 +6,11 @@ namespace ContextHub.Infrastructure.Models.Catalog;
 public sealed class CatalogSearchRowModel
 {
     /// <summary>
+    /// Gets or sets the package UUID used only by Owner projections.
+    /// </summary>
+    public Guid Id { get; set; }
+
+    /// <summary>
     /// Gets or sets the public package identifier returned by SQL.
     /// </summary>
     public string PackageId { get; set; } = "";

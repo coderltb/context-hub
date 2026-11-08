@@ -29,6 +29,8 @@ public sealed class RecommendationRepository(
 
         var order = request.Sort switch
         {
+            "signalCount" => QueryOrder<Recommendation>.By(value => value.SignalCount),
+            "-signalCount" => QueryOrder<Recommendation>.By(value => value.SignalCount, true),
             "createdAt" => QueryOrder<Recommendation>.By(value => value.CreatedAt),
             "-createdAt" => QueryOrder<Recommendation>.By(value => value.CreatedAt, true),
             "updatedAt" => QueryOrder<Recommendation>.By(value => value.UpdatedAt),

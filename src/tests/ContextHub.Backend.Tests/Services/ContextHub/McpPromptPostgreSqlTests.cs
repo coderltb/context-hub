@@ -55,6 +55,8 @@ public sealed partial class TelemetryPostgreSqlTests
         var data = document.RootElement.GetProperty("data");
         var id = data.GetProperty("id").GetGuid();
         var token = data.GetProperty("concurrencyToken").GetString()!;
+        var argumentId = data.GetProperty("arguments")[0].GetProperty("argumentId").GetGuid();
+        Assert.NotEqual(Guid.Empty, argumentId);
         Assert.Equal(HttpStatusCode.Conflict, (await http.PostAsJsonAsync(route, body)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await http.GetAsync(route + "/" + id)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync(route + "/" + Guid.NewGuid())).StatusCode);
@@ -64,6 +66,24 @@ public sealed partial class TelemetryPostgreSqlTests
         };
         Assert.Equal(HttpStatusCode.OK, (await http.PutAsJsonAsync(route + "/" + id, update)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await http.PutAsJsonAsync(route + "/" + id, update)).StatusCode);
+        using var saved = JsonDocument.Parse(await (await http.GetAsync(route + "/" + id)).Content.ReadAsStringAsync());
+        var savedData = saved.RootElement.GetProperty("data");
+        Assert.Equal(argumentId, Assert.Single(savedData.GetProperty("arguments").EnumerateArray()).GetProperty("argumentId").GetGuid());
+        var removal = update with
+        {
+            IsEnabled = true,
+            RemovedArgumentIds = [argumentId],
+            Arguments = [new() { Name = "replacement" }],
+            ConcurrencyToken = savedData.GetProperty("concurrencyToken").GetString()!
+        };
+        using var removed = await http.PutAsJsonAsync(route + "/" + id, removal);
+        Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
+        using var removedJson = JsonDocument.Parse(await removed.Content.ReadAsStringAsync());
+        var definitions = removedJson.RootElement.GetProperty("data").GetProperty("arguments");
+        Assert.True(definitions.EnumerateArray().Single(value => value.GetProperty("argumentId").GetGuid() == argumentId).GetProperty("isDeleted").GetBoolean());
+        await using var scope = app.Services.CreateAsyncScope();
+        var runtime = await scope.ServiceProvider.GetRequiredService<IMcpPromptService>().FindEnabledAsync("owner_flow", CancellationToken.None);
+        Assert.Equal("replacement", Assert.Single(runtime!.Arguments).Name);
         Assert.Equal(HttpStatusCode.BadRequest, (await http.GetAsync(route + "?page=2147483647&pageSize=100")).StatusCode);
         using var page = JsonDocument.Parse(await (await http.GetAsync(route + "?sort=updatedAt%20desc")).Content.ReadAsStringAsync());
         Assert.All(page.RootElement.GetProperty("data").GetProperty("items").EnumerateArray(), value => Assert.False(value.TryGetProperty("content", out _)));
@@ -132,6 +152,7 @@ public sealed partial class TelemetryPostgreSqlTests
     {
         await using var connection = await _dataSource.OpenConnectionAsync();
         await connection.ExecuteAsync("UPDATE access.\"Prompt\" SET \"Content\"='Owner edit' WHERE \"Name\"='help_flow'; UPDATE access.\"Tool\" SET \"Title\"='Owner title' WHERE \"Name\"='catalog_search'");
+        var originalArguments = await connection.ExecuteScalarAsync<string>("SELECT \"Arguments\"::text FROM access.\"Prompt\" WHERE \"Name\"='discover_flow'");
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (!Directory.Exists(Path.Combine(directory!.FullName, "Documents"))) directory = directory.Parent;
         foreach (var name in new[] { "06-mcp-configuration-upgrade.sql", "02-seed-data.sql" })
@@ -143,6 +164,7 @@ public sealed partial class TelemetryPostgreSqlTests
         Assert.Equal("Owner edit", await connection.ExecuteScalarAsync<string>("SELECT \"Content\" FROM access.\"Prompt\" WHERE \"Name\"='help_flow'"));
         Assert.Equal("Owner title", await connection.ExecuteScalarAsync<string>("SELECT \"Title\" FROM access.\"Tool\" WHERE \"Name\"='catalog_search'"));
         Assert.Equal(6L, await connection.ExecuteScalarAsync<long>("SELECT count(*) FROM access.\"Prompt\""));
+        Assert.Equal(originalArguments, await connection.ExecuteScalarAsync<string>("SELECT \"Arguments\"::text FROM access.\"Prompt\" WHERE \"Name\"='discover_flow'"));
         // Simulate the previous deployment shape after proving repeatable seeds preserve edits.
         await connection.ExecuteAsync("ALTER TABLE access.\"Tool\" DROP COLUMN \"Title\", DROP COLUMN \"Description\"; DROP TABLE access.\"Prompt\"");
         var upgrade = await _container.ExecAsync(["psql", "-X", "-U", "postgres", "-d", "context_hub_telemetry_design_review", "-v", "review_only_ack=true", "-f", "/tmp/06-mcp-configuration-upgrade.sql"]);

@@ -188,11 +188,17 @@ public sealed partial class TelemetryPostgreSqlTests : IAsyncLifetime
         await using var context = CreateContext();
         var unitOfWork = new UnitOfWork<ContextHubDbContext>(context, NullLogger<UnitOfWork<ContextHubDbContext>>.Instance);
         var service = new ToolStateService(new ToolRepository(context, unitOfWork, NullLogger<ToolRepository>.Instance));
-        var initial = (await service.GetListAsync(CancellationToken.None)).Items.Single(value => value.Name == "bundle_resolve");
+        var initial = (await service.GetListAsync(new(), CancellationToken.None)).Items.Single(value => value.Name == "bundle_resolve");
+        var filtered = await service.GetListAsync(new() { Query = "BUNDLE", IsEnabled = true, PageSize = 1 }, CancellationToken.None);
+        Assert.Equal(1, filtered.TotalCount);
+        Assert.Equal(initial.ToolId, Assert.Single(filtered.Items).ToolId);
+        var emptyPage = await service.GetListAsync(new() { Query = "BUNDLE", IsEnabled = true, PageSize = 1, Page = 2 }, CancellationToken.None);
+        Assert.Equal(1, emptyPage.TotalCount);
+        Assert.Empty(emptyPage.Items);
         var request = new UpdateMcpToolRequestDto { IsEnabled = false, ConcurrencyToken = initial.ConcurrencyToken,
             Title = "Owner title", Description = "Owner description" };
-        Assert.False((await service.UpdateAsync(initial.Name, request, CancellationToken.None)).IsEnabled);
-        var saved = (await service.GetListAsync(CancellationToken.None)).Items.Single(value => value.Name == initial.Name);
+        Assert.False((await service.UpdateAsync(initial.ToolId, request, CancellationToken.None)).IsEnabled);
+        var saved = (await service.GetListAsync(new(), CancellationToken.None)).Items.Single(value => value.Name == initial.Name);
         Assert.Equal("Owner title", saved.Title);
         Assert.True(saved.UpdatedAt > DateTimeOffset.MinValue);
         var definition = new McpContractRegistry(await service.GetContractsAsync(initial.Name, CancellationToken.None)).GetDefinition(initial.Name);
@@ -200,11 +206,11 @@ public sealed partial class TelemetryPostgreSqlTests : IAsyncLifetime
         Assert.Equal("Owner description", definition.Description);
         Assert.True(definition.Annotations!.ReadOnlyHint);
         Assert.DoesNotContain(initial.Name, await service.GetEnabledNamesAsync(CancellationToken.None));
-        await Assert.ThrowsAsync<BusinessException>(() => service.UpdateAsync(initial.Name, request, CancellationToken.None));
+        await Assert.ThrowsAsync<BusinessException>(() => service.UpdateAsync(initial.ToolId, request, CancellationToken.None));
         await using var connection = await _dataSource.OpenConnectionAsync();
         await connection.ExecuteAsync("DELETE FROM access.\"Tool\" WHERE \"Name\"='package_get'");
         await Assert.ThrowsAsync<ToolStateUnavailableException>(() => service.IsEnabledAsync("package_get", CancellationToken.None));
-        await Assert.ThrowsAsync<ToolStateUnavailableException>(() => service.GetListAsync(CancellationToken.None));
+        Assert.DoesNotContain((await service.GetListAsync(new(), CancellationToken.None)).Items, value => value.Name == "package_get");
         await Assert.ThrowsAsync<ToolStateUnavailableException>(() => service.GetEnabledNamesAsync(CancellationToken.None));
     }
 

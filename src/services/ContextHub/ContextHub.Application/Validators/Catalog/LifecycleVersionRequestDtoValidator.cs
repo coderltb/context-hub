@@ -12,6 +12,6 @@ public sealed class LifecycleVersionRequestDtoValidator : AbstractValidator<Life
     {
         RuleFor(value => value.ConcurrencyToken).NotEmpty().Must(value => uint.TryParse(value, out _));
 
-        RuleFor(value => value.ReplacementVersion).MaximumLength(64).Matches(CatalogConstants.STABLE_VERSION_PATTERN).When(value => value.ReplacementVersion != null);
+        RuleFor(value => value.ReplacementVersion).Matches(CatalogConstants.STABLE_VERSION_PATTERN).When(value => value.ReplacementVersion is not null);
     }
 }

@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
+    <script src="~/js/sso-theme.js" asp-append-version="true"></script>
     <title>@ViewData["Title"] — Authentication</title>
     <link rel="icon" type="image/svg+xml" href="~/favicon.svg" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/sso.css" asp-append-version="true" />
@@ -13,6 +14,13 @@
     <main class="sso-card">
         <header class="sso-header">
             <a class="sso-brand" href="@AuthenticationConstants.Endpoints.HOME_PAGE">Authentication</a>
+            <label class="sso-theme" for="sso-theme">Theme
+                <select id="sso-theme" aria-label="Color theme">
+                    <option value="system">System</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </label>
         </header>
 
         @RenderBody()

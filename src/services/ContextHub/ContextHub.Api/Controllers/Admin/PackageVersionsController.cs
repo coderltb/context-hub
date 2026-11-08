@@ -20,7 +20,7 @@ public sealed class PackageVersionsController(IMediator mediator) : BaseApiContr
     [ProducesResponseType<ApiResponse<PageResponse<VersionSummaryResponseDto>>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetList(
-        string packageId,
+        Guid packageId,
         [FromQuery] VersionListRequestDto request,
         CancellationToken cancellationToken)
     {
@@ -40,7 +40,7 @@ public sealed class PackageVersionsController(IMediator mediator) : BaseApiContr
     [ProducesResponseType<ApiResponse<VersionResponseDto>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get(
-        string packageId,
+        Guid packageId,
         string version,
         CancellationToken cancellationToken)
     {
@@ -61,11 +61,13 @@ public sealed class PackageVersionsController(IMediator mediator) : BaseApiContr
     [ProducesResponseType<ApiResponse<PackagePreviewResponseDto>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Preview(
-        string packageId,
+        Guid packageId,
         [FromBody] PublishVersionRequestDto request,
         CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new PreviewPackageVersionCommand(packageId, request), cancellationToken);
+        var result = await Mediator.Send(
+            new PreviewPackageVersionCommand(packageId, request),
+            cancellationToken);
 
         return Ok(result);
     }
@@ -81,11 +83,13 @@ public sealed class PackageVersionsController(IMediator mediator) : BaseApiContr
     [ProducesResponseType<ApiResponse<VersionResponseDto>>(StatusCodes.Status201Created)]
     [OpenApiOperation(StatusCodes.Status201Created, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Publish(
-        string packageId,
+        Guid packageId,
         [FromBody] PublishVersionRequestDto request,
         CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new PublishPackageVersionCommand(packageId, request), cancellationToken);
+        var result = await Mediator.Send(
+            new PublishPackageVersionCommand(packageId, request),
+            cancellationToken);
 
         return CreatedAtAction(nameof(Get), new { packageId, version = result.Data!.Version }, result);
     }
@@ -102,12 +106,14 @@ public sealed class PackageVersionsController(IMediator mediator) : BaseApiContr
     [ProducesResponseType<ApiResponse<VersionResponseDto>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Deprecate(
-        string packageId,
+        Guid packageId,
         string version,
         [FromBody] LifecycleVersionRequestDto request,
         CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new DeprecatePackageVersionCommand(packageId, version, request), cancellationToken);
+        var result = await Mediator.Send(
+            new DeprecatePackageVersionCommand(packageId, version, request),
+            cancellationToken);
 
         return Ok(result);
     }
@@ -124,12 +130,14 @@ public sealed class PackageVersionsController(IMediator mediator) : BaseApiContr
     [ProducesResponseType<ApiResponse<VersionResponseDto>>(StatusCodes.Status200OK)]
     [OpenApiOperation(StatusCodes.Status200OK, StatusCodes.Status404NotFound, StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Revoke(
-        string packageId,
+        Guid packageId,
         string version,
         [FromBody] LifecycleVersionRequestDto request,
         CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new RevokePackageVersionCommand(packageId, version, request), cancellationToken);
+        var result = await Mediator.Send(
+            new RevokePackageVersionCommand(packageId, version, request),
+            cancellationToken);
 
         return Ok(result);
     }

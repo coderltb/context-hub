@@ -12,6 +12,15 @@ public sealed class ToolRepository(
     ILogger<ToolRepository> logger) : GenericRepository<Tool>(contextHubDbContext, logger), IToolRepository
 {
     /// <summary>
+    /// Reads one stored tool including both schemas, even when it is disabled.
+    /// </summary>
+    /// <param name="toolId">The immutable Owner-facing identity.</param>
+    /// <param name="cancellationToken">Cancels the database read.</param>
+    /// <returns>The current configuration.</returns>
+    public Task<Tool?> GetDetailAsync(Guid toolId, CancellationToken cancellationToken) =>
+        FirstOrDefaultAsync(value => value.Id == toolId, cancellationToken: cancellationToken);
+
+    /// <summary>
     /// Reads current state without retaining tracked entries for discovery.
     /// </summary>
     /// <param name="cancellationToken">Cancels the authoritative read.</param>
@@ -39,7 +48,7 @@ public sealed class ToolRepository(
     /// <returns>Enabled connection names without configuration values.</returns>
     public async Task<IReadOnlyList<string>> GetConnectionNamesAsync(CancellationToken cancellationToken)
     {
-        var connections = await contextHubDbContext.ExternalMcps.AsNoTracking()
+        var connections = await contextHubDbContext.ExternalMcps.AsNoTracking().Where(value => value.Status == ExternalMcpStatus.Active)
             .Select(value => new { value.Name, value.Config }).ToArrayAsync(cancellationToken);
 
         return connections.Where(value => JsonNode.Parse(value.Config)?["enabled"]?.GetValue<bool>() == true)
@@ -49,18 +58,23 @@ public sealed class ToolRepository(
     /// <summary>
     /// Updates one tracked row using the caller's expected xmin value.
     /// </summary>
-    /// <param name="toolName">The registered public name.</param>
+    /// <param name="toolId">The stored tool UUID selected by Owner.</param>
     /// <param name="request">The desired state and expected version.</param>
     /// <param name="cancellationToken">Cancels lookup and save.</param>
     /// <returns>The newly committed state.</returns>
     public async Task<Tool> SaveStateAsync(
-        string toolName,
+        Guid toolId,
         UpdateMcpToolRequestDto request,
         CancellationToken cancellationToken)
     {
         var expected = PersistenceConcurrencyHelper.Decode(request.ConcurrencyToken);
-        var entity = await FirstOrDefaultAsync(value => value.Name == toolName, cancellationToken: cancellationToken)
-            ?? throw new ToolStateUnavailableException();
+        var entity = await FirstOrDefaultAsync(
+            value => value.Id == toolId,
+            cancellationToken: cancellationToken)
+            ?? throw new BusinessException(
+                TelemetryErrorConstants.TOOL_NAME_INVALID,
+                "The requested tool was not found.",
+                BusinessErrorKind.NotFound);
         if (entity.ConcurrencyVersion != expected)
         {
             throw new BusinessException(
@@ -77,7 +91,9 @@ public sealed class ToolRepository(
             // Native xmin still closes the race between the initial read and final write.
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateConcurrencyException exception) when (exception.Entries.Count == 1 && ReferenceEquals(exception.Entries[0].Entity, entity))
+        catch (DbUpdateConcurrencyException exception) when (exception.Entries.Count == 1 && ReferenceEquals(
+            exception.Entries[0].Entity,
+            entity))
         {
             logger.LogWarning(TelemetryLogConstants.CONCURRENCY_REJECTED, nameof(SaveStateAsync));
             throw new BusinessException(
@@ -88,4 +104,24 @@ public sealed class ToolRepository(
 
         return entity;
     }
+
+    /// <summary>
+    /// Applies the same filters to count and rows with a unique final ordering key.
+    /// </summary>
+    /// <param name="request">The Owner list filters.</param>
+    /// <param name="cancellationToken">Cancels provider reads.</param>
+    /// <returns>The matching metadata page.</returns>
+    public Task<PageResponse<ToolStateModel>> GetPageAsync(
+        GetMcpToolsRequestDto request,
+        CancellationToken cancellationToken) =>
+        GetPageAsync<ToolStateModel>(
+            new PageRequest(request.Page, request.PageSize),
+            QueryOrder<Tool>.By(value => value.Name).ThenBy(value => value.Id),
+            search: new SearchOptions<Tool>
+            {
+                SearchTerm = request.Query?.Trim().ToLowerInvariant(),
+                TextFields = [value => value.Name.ToLower(), value => value.Title.ToLower(), value => value.Description.ToLower()],
+                FieldFilters = [request.IsEnabled is { } enabled ? value => value.IsEnabled == enabled : null]
+            },
+            cancellationToken: cancellationToken);
 }

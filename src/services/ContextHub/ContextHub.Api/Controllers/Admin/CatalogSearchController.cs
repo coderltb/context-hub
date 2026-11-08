@@ -16,7 +16,7 @@ public sealed class CatalogSearchController(IMediator mediator) : BaseApiControl
     /// <param name="cancellationToken">Cancels the owned operation.</param>
     /// <returns>The handler-owned response envelope.</returns>
     [HttpPost]
-    [ProducesResponseType<ApiResponse<CatalogSearchResponseDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiResponse<AdminCatalogSearchResponseDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> Search(
         [FromBody] CatalogSearchRequestDto request,
         CancellationToken cancellationToken)

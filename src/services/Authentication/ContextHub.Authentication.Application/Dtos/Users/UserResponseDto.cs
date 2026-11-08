@@ -20,4 +20,10 @@ public sealed record UserResponseDto(
     string[] Roles,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string ConcurrencyToken);
+    string ConcurrencyToken)
+{
+    /// <summary>
+    /// Gets stable role IDs for the Owner editor independently of display names.
+    /// </summary>
+    public Guid[] RoleIds { get; init; } = [];
+}

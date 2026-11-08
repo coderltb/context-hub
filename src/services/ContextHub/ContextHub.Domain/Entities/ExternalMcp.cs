@@ -11,6 +11,11 @@ public sealed class ExternalMcp : BaseEntity<Guid>
     public string Name { get; set; } = "";
 
     /// <summary>
+    /// Gets or sets retained lifecycle independently of Config.enabled.
+    /// </summary>
+    public ExternalMcpStatus Status { get; set; } = ExternalMcpStatus.Active;
+
+    /// <summary>
     /// Gets or sets the canonical validated connection JSON.
     /// </summary>
     public string Config { get; set; } = "{}";

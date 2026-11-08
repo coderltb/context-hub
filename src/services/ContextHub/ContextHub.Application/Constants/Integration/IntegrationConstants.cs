@@ -6,6 +6,16 @@ namespace ContextHub.Application.Constants.Integration;
 public static class IntegrationConstants
 {
     /// <summary>
+    /// Identifies a connection that may participate in current routing policy.
+    /// </summary>
+    public const string ACTIVE = "active";
+
+    /// <summary>
+    /// Identifies a retained connection with no routing authority.
+    /// </summary>
+    public const string DELETED = "deleted";
+
+    /// <summary>
     /// Bounds each managed-search rank branch before reciprocal-rank fusion.
     /// </summary>
     public const int SEARCH_BRANCH_CANDIDATES = 1000;

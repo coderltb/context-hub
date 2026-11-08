@@ -1,13 +1,22 @@
 @page
+@model ContextHub.Authentication.Api.Pages.IndexModel
 @{
     ViewData["Title"] = "Single sign-on";
 }
 <h1>Single sign-on</h1>
-
-<p>Owner accounts sign in with a username and password. Client credentials are managed independently.</p>
-<nav aria-label="Account">
-    <ul>
-        <li><a asp-page="@SsoPageConstants.LOGIN_PAGE">Sign in</a></li>
-        <li><a asp-page="@SsoPageConstants.LOGOUT_PAGE">Sign out</a></li>
-    </ul>
-</nav>
+@if (Model.IsSignedIn)
+{
+    <p>You are signed in. Continue to your Console or end this browser session.</p>
+    <nav class="sso-form" aria-label="Account">
+        @if (Model.ConsoleUrl is not null)
+        {
+            <a href="@Model.ConsoleUrl">Go to Console</a>
+        }
+        <a asp-page="@SsoPageConstants.LOGOUT_PAGE">Sign out</a>
+    </nav>
+}
+else
+{
+    <p>Sign in with your Owner username and password to continue.</p>
+    <a asp-page="@SsoPageConstants.LOGIN_PAGE">Sign in</a>
+}

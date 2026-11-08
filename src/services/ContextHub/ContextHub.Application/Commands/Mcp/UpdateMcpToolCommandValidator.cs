@@ -10,7 +10,7 @@ public sealed class UpdateMcpToolCommandValidator : AbstractValidator<UpdateMcpT
     /// </summary>
     public UpdateMcpToolCommandValidator()
     {
-        RuleFor(value => value.ToolName).Must(value => ToolCatalogConstants.TOOLS.Any(tool => tool.Name == value));
+        RuleFor(value => value.ToolId).NotEmpty();
         RuleFor(value => value.Request.Title).Must(value => value is null || !string.IsNullOrWhiteSpace(value));
         RuleFor(value => value.Request.Description).Must(value => value is null || !string.IsNullOrWhiteSpace(value));
         RuleFor(value => value.Request.ConcurrencyToken).NotEmpty().MaximumLength(32);

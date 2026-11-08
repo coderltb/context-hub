@@ -6,9 +6,14 @@ namespace ContextHub.Application.Dtos.Catalog;
 public sealed record VersionResponseDto
 {
     /// <summary>
-    /// Gets the stable public package identity, never the internal database UUID.
+    /// Gets the immutable public package key.
     /// </summary>
-    public string PackageId { get; init; } = "";
+    public string Key { get; init; } = "";
+
+    /// <summary>
+    /// Gets the stable package UUID used by Owner operations.
+    /// </summary>
+    public Guid PackageId { get; init; }
 
     /// <summary>
     /// Gets the exact stable X.Y.Z release; lookup requests may omit it to select the latest published release.
@@ -26,7 +31,7 @@ public sealed record VersionResponseDto
     public string ContentHash { get; init; } = "";
 
     /// <summary>
-    /// Gets the optional existing non-revoked release suggested as a replacement.
+    /// Gets the selected replacement SemVer; new selections must be published in the same package.
     /// </summary>
     public string? ReplacementVersion { get; init; }
 
@@ -74,4 +79,10 @@ public sealed record VersionResponseDto
     /// Gets the exact full Git commit reviewed for this publication.
     /// </summary>
     public string SourceCommitSha { get; init; } = "";
+
+    /// <summary>
+    /// Gets the public guidance projection when reading a version detail.
+    /// </summary>
+    public PackagePublicPreviewResponseDto? PublicPreview { get; init; }
+
 }

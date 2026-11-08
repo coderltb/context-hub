@@ -8,7 +8,7 @@ public sealed record CreatePackageRequestDto
     /// <summary>
     /// Gets the stable public package identity, never the internal database UUID.
     /// </summary>
-    public string PackageId { get; init; } = "";
+    public string Key { get; init; } = "";
 
     /// <summary>
     /// Gets the closed package-kind vocabulary value.
