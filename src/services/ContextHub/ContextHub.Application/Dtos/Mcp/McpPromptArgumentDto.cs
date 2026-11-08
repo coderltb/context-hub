@@ -6,6 +6,16 @@ namespace ContextHub.Application.Dtos.Mcp;
 public sealed record McpPromptArgumentDto
 {
     /// <summary>
+    /// Gets the stored identity; absent for a new draft argument.
+    /// </summary>
+    public Guid? ArgumentId { get; init; }
+
+    /// <summary>
+    /// Gets whether the retained definition has been explicitly removed.
+    /// </summary>
+    public bool IsDeleted { get; init; }
+
+    /// <summary>
     /// Gets the argument name supplied by MCP clients.
     /// </summary>
     public string Name { get; init; } = "";

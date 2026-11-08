@@ -21,7 +21,11 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
         var access = owner.Credentials.GetProperty("access_token").GetString()!;
         var client = await CreateClientAsync(access,
             "catalog_search", "package_get", "bundle_resolve", "compatibility_check", "revocation_check", "quality_signal_submit");
-        await PublishDocumentedPackagesAsync(access);
+        var releases = await PublishDocumentedPackagesAsync(access);
+        var adminSearch = (await SendJsonAsync(Hub, HttpMethod.Post, "/api/admin/v1/catalog/search", access,
+            new CatalogSearchRequestDto { Query = "api review" })).GetProperty("data");
+        var adminWorkflow = adminSearch.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("key").GetString() == Workflow);
+        Assert.Equal(releases[Workflow].PackageId, adminWorkflow.GetProperty("packageId").GetGuid());
 
         await using var mcp = await ConnectMcpAsync(client.GetProperty("token").GetString()!);
         Assert.Equal(6, (await mcp.ListToolsAsync()).Count);
@@ -70,7 +74,7 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
         Assert.Equal("deduplicated", (await CallToolAsync(mcp, "quality_signal_submit", signal)).GetProperty("status").GetString());
 
         var recommendations = (await SendJsonAsync(Hub, HttpMethod.Get,
-            "/api/admin/v1/recommendations?packageId=" + Workflow, access)).GetProperty("data").GetProperty("items");
+            "/api/admin/v1/recommendations?sort=-signalCount&packageId=" + Workflow, access)).GetProperty("data").GetProperty("items");
         var recommendation = Assert.Single(recommendations.EnumerateArray());
         Assert.Equal(2, recommendation.GetProperty("signalCount").GetInt64());
         var id = recommendation.GetProperty("id").GetGuid();
@@ -87,11 +91,19 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
 
         var dashboard = (await SendJsonAsync(Hub, HttpMethod.Get, "/api/admin/v1/dashboard/summary", access)).GetProperty("data");
         Assert.Equal(4, dashboard.GetProperty("catalog").GetProperty("publishedVersions").GetInt64());
+        Assert.All(dashboard.GetProperty("topPackages").EnumerateArray(), item =>
+            Assert.False(string.IsNullOrWhiteSpace(item.GetProperty("packageType").GetString())));
         Assert.True(dashboard.GetProperty("usage").GetProperty("errorCount").GetInt64() >= 1);
 
         // Revoking a dependency must invalidate authority even when the root content was already cached.
-        var rule = (await SendJsonAsync(Hub, HttpMethod.Get, $"/api/admin/v1/packages/{Rule}/versions/{Version}", access)).GetProperty("data");
-        await SendJsonAsync(Hub, HttpMethod.Post, $"/api/admin/v1/packages/{Rule}/versions/{Version}/revoke", access,
+        var rulePath = $"/api/admin/v1/packages/{releases[Rule].PackageId}/versions/{releases[Rule].Version}";
+        var rule = (await SendJsonAsync(Hub, HttpMethod.Get, rulePath, access)).GetProperty("data");
+        var publicPreview = rule.GetProperty("publicPreview");
+        Assert.Equal(Rule, publicPreview.GetProperty("packageId").GetString());
+        Assert.Equal(Version, publicPreview.GetProperty("version").GetString());
+        Assert.False(publicPreview.TryGetProperty("manifest", out _));
+        Assert.False(publicPreview.TryGetProperty("authoring_source", out _));
+        await SendJsonAsync(Hub, HttpMethod.Post, rulePath + "/revoke", access,
             new LifecycleVersionRequestDto { ConcurrencyToken = rule.GetProperty("concurrencyToken").GetString()! });
         var blocked = await mcp.CallToolAsync("bundle_resolve", new Dictionary<string, object?> { ["package_id"] = Workflow });
         Assert.True(blocked.IsError);
@@ -142,7 +154,12 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
         var update = new UpdateMcpPromptRequestDto
         {
             Content = "The Owner changed this configuration.",
-            Arguments = [new McpPromptArgumentDto { Name = "area", Required = true }],
+            Arguments = [new McpPromptArgumentDto
+            {
+                ArgumentId = prompt.GetProperty("arguments")[0].GetProperty("argumentId").GetGuid(),
+                Name = "area",
+                Required = true
+            }],
             IsEnabled = true,
             ConcurrencyToken = prompt.GetProperty("concurrencyToken").GetString()!
         };
@@ -160,11 +177,30 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
 
         var tools = (await SendJsonAsync(Hub, HttpMethod.Get, "/api/admin/v1/mcp-tools", access)).GetProperty("data").GetProperty("items");
         var search = tools.EnumerateArray().Single(item => item.GetProperty("name").GetString() == "catalog_search");
-        await SendJsonAsync(Hub, HttpMethod.Put, "/api/admin/v1/mcp-tools/catalog_search", access, new UpdateMcpToolRequestDto
+        await SendJsonAsync(Hub, HttpMethod.Put, $"/api/admin/v1/mcp-tools/{search.GetProperty("toolId").GetGuid()}", access, new UpdateMcpToolRequestDto
         {
             IsEnabled = false,
             ConcurrencyToken = search.GetProperty("concurrencyToken").GetString()!
         });
+        var detailPath = $"/api/admin/v1/mcp-tools/{search.GetProperty("toolId").GetGuid()}";
+        var detail = (await SendJsonAsync(Hub, HttpMethod.Get, detailPath, access)).GetProperty("data");
+        Assert.False(detail.GetProperty("isEnabled").GetBoolean());
+        Assert.Equal(JsonValueKind.Object, detail.GetProperty("inputSchema").ValueKind);
+        Assert.Equal(JsonValueKind.Object, detail.GetProperty("outputSchema").ValueKind);
+        Assert.Equal("contexthub://catalog/index", Assert.Single(detail.GetProperty("resources").EnumerateArray()).GetProperty("uri").GetString());
+        await SendJsonAsync(Hub, HttpMethod.Get, detailPath, firstToken, expected: HttpStatusCode.Forbidden);
+        await SendJsonAsync(Hub, HttpMethod.Get, $"/api/admin/v1/mcp-tools/{Guid.NewGuid()}", access, expected: HttpStatusCode.NotFound);
+        using (var anonymousClient = Hub.GetTestClient())
+        using (var anonymous = await anonymousClient.GetAsync(detailPath))
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        }
+        var matchingClient = (await SendJsonAsync(Authentication, HttpMethod.Get,
+            $"/api/admin/v1/clients?query={clientId}", access)).GetProperty("data");
+        Assert.Equal(1, matchingClient.GetProperty("totalCount").GetInt64());
+        var absentClient = (await SendJsonAsync(Authentication, HttpMethod.Get,
+            $"/api/admin/v1/clients?query={Guid.NewGuid()}", access)).GetProperty("data");
+        Assert.Equal(0, absentClient.GetProperty("totalCount").GetInt64());
         Assert.DoesNotContain(await mcp.ListToolsAsync(), tool => tool.Name == "catalog_search");
         Assert.True((await mcp.CallToolAsync("catalog_search", new Dictionary<string, object?> { ["query"] = "review" })).IsError);
 
@@ -201,6 +237,53 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
             new { marker = "%transient-user-input-marker%" }));
         Assert.False((await database.Prompts.AsNoTracking().SingleAsync(value => value.Id == promptId)).IsEnabled);
         await AssertAnonymousHealthAsync();
+    }
+
+    /// <summary>
+    /// Filters application identities in PostgreSQL and assigns native memberships using stable role identities.
+    /// </summary>
+    /// <returns>The HTTP paging, identity selection and last-Owner assertions.</returns>
+    [Fact]
+    public async Task OwnerConsoleClientFiltersAndRoleIdsUseCurrentDatabaseState()
+    {
+        var owner = await CreateOwnerAsync("identity-owner");
+        var access = owner.Credentials.GetProperty("access_token").GetString()!;
+        var profilePath = $"/api/admin/v1/users/{owner.Id}";
+        var profile = (await SendJsonAsync(Authentication, HttpMethod.Get, profilePath, access)).GetProperty("data");
+        var roleId = Assert.Single(profile.GetProperty("roleIds").EnumerateArray()).GetGuid();
+        Assert.Equal("Owner", Assert.Single(profile.GetProperty("roles").EnumerateArray()).GetString());
+        await SendJsonAsync(Authentication, HttpMethod.Put, profilePath + "/roles", access,
+            new { roleIds = Array.Empty<Guid>(), concurrencyToken = profile.GetProperty("concurrencyToken").GetString() },
+            HttpStatusCode.Conflict);
+        await SendJsonAsync(Authentication, HttpMethod.Put, profilePath + "/roles", access,
+            new { roleIds = new[] { Guid.NewGuid() }, concurrencyToken = profile.GetProperty("concurrencyToken").GetString() },
+            HttpStatusCode.BadRequest);
+
+        var second = await CreateOwnerAsync("second-identity-owner");
+        var targetPath = $"/api/admin/v1/users/{second.Id}";
+        var target = (await SendJsonAsync(Authentication, HttpMethod.Get, targetPath, access)).GetProperty("data");
+        target = (await SendJsonAsync(Authentication, HttpMethod.Put, targetPath + "/roles", access,
+            new { roleIds = Array.Empty<Guid>(), concurrencyToken = target.GetProperty("concurrencyToken").GetString() })).GetProperty("data");
+        Assert.Empty(target.GetProperty("roleIds").EnumerateArray());
+        target = (await SendJsonAsync(Authentication, HttpMethod.Put, targetPath + "/roles", access,
+            new { roleIds = new[] { roleId }, concurrencyToken = target.GetProperty("concurrencyToken").GetString() })).GetProperty("data");
+        Assert.Equal(roleId, Assert.Single(target.GetProperty("roleIds").EnumerateArray()).GetGuid());
+        Assert.Equal("Owner", Assert.Single(target.GetProperty("roles").EnumerateArray()).GetString());
+
+        var firstClient = await CreateClientAsync(access, "catalog_search");
+        await CreateClientAsync(access, "package_get");
+        var clientPath = $"/api/admin/v1/clients/{firstClient.GetProperty("clientId").GetGuid()}";
+        var client = (await SendJsonAsync(Authentication, HttpMethod.Get, clientPath, access)).GetProperty("data").GetProperty("client");
+        await SendJsonAsync(Authentication, HttpMethod.Put, clientPath, access,
+            new UpdateClientRequestDto("Synthetic disabled", false, client.GetProperty("concurrencyToken").GetString()!));
+        var filtered = (await SendJsonAsync(Authentication, HttpMethod.Get,
+            "/api/admin/v1/clients?query=synthetic&isActive=false&page=1&pageSize=1", access)).GetProperty("data");
+        Assert.Equal(1, filtered.GetProperty("totalCount").GetInt64());
+        Assert.Equal(firstClient.GetProperty("clientId").GetGuid(), Assert.Single(filtered.GetProperty("items").EnumerateArray()).GetProperty("clientId").GetGuid());
+        var empty = (await SendJsonAsync(Authentication, HttpMethod.Get,
+            "/api/admin/v1/clients?query=does-not-exist&isActive=true", access)).GetProperty("data");
+        Assert.Equal(0, empty.GetProperty("totalCount").GetInt64());
+        Assert.Empty(empty.GetProperty("items").EnumerateArray());
     }
 
     /// <summary>
@@ -281,8 +364,9 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
         Assert.True(await userManager.CheckPasswordAsync(user, replacement));
     }
 
-    private async Task PublishDocumentedPackagesAsync(string access)
+    private async Task<Dictionary<string, (Guid PackageId, string Version)>> PublishDocumentedPackagesAsync(string access)
     {
+        var releases = new Dictionary<string, (Guid PackageId, string Version)>(StringComparer.Ordinal);
         var source = (await SendJsonAsync(Hub, HttpMethod.Post, "/api/admin/v1/repositories", access,
             new CreateRepositoryRequestDto
             {
@@ -305,14 +389,14 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
                 manifest.ToJsonString(),
                 await File.ReadAllTextAsync(Path.Combine(root, file)),
                 commit));
-            await SendJsonAsync(Hub, HttpMethod.Post, "/api/admin/v1/packages", access,
+            var package = (await SendJsonAsync(Hub, HttpMethod.Post, "/api/admin/v1/packages", access,
                 new CreatePackageRequestDto
                 {
-                    PackageId = id,
+                    Key = id,
                     PackageType = kind,
                     DisplayName = "Documented " + kind + " review",
                     Summary = "Evidence-based API review guidance."
-                }, HttpStatusCode.Created);
+                }, HttpStatusCode.Created)).GetProperty("data");
             var publish = new PublishVersionRequestDto
             {
                 Version = Version,
@@ -320,13 +404,14 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
                 SourceCommitSha = commit,
                 SourcePath = path
             };
-            var versionsPath = $"/api/admin/v1/packages/{id}/versions";
+            var versionsPath = $"/api/admin/v1/packages/{package.GetProperty("packageId").GetGuid()}/versions";
             var preview = (await SendJsonAsync(Hub, HttpMethod.Post, versionsPath + "/preview", access, publish)).GetProperty("data");
             Assert.Equal("ready", preview.GetProperty("readiness").GetProperty("status").GetString());
             var empty = (await SendJsonAsync(Hub, HttpMethod.Get, versionsPath, access)).GetProperty("data").GetProperty("items");
             Assert.Empty(empty.EnumerateArray());
             var first = (await SendJsonAsync(Hub, HttpMethod.Post, versionsPath, access, publish, HttpStatusCode.Created)).GetProperty("data");
             var replay = (await SendJsonAsync(Hub, HttpMethod.Post, versionsPath, access, publish, HttpStatusCode.Created)).GetProperty("data");
+            releases.Add(id, (package.GetProperty("packageId").GetGuid(), first.GetProperty("version").GetString()!));
             Assert.Equal(first.GetProperty("contentHash").GetString(), replay.GetProperty("contentHash").GetString());
             Assert.Equal(first.GetProperty("publishedAt").GetString(), replay.GetProperty("publishedAt").GetString());
         }
@@ -334,6 +419,8 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
         var synced = (await SendJsonAsync(Hub, HttpMethod.Post, $"/api/admin/v1/repositories/{repositoryId}/sync", access,
             new SyncRepositoryRequestDto { ConcurrencyToken = source.GetProperty("concurrencyToken").GetString()! })).GetProperty("data");
         Assert.Equal(new string('1', 40), synced.GetProperty("resolvedCommitSha").GetString());
+
+        return releases;
     }
 
     private static async Task<JsonElement> CallToolAsync(McpClient client, string name, Dictionary<string, object?> arguments)
@@ -403,3 +490,4 @@ public sealed class BothServicesBusinessFlowTests : BothServicesFlowFixture
         }
     }
 }
+

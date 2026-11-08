@@ -20,6 +20,6 @@ public sealed class PackageListRequestDtoValidator : AbstractValidator<PackageLi
 
         RuleFor(value => value.PackageType).Must(value => value == null || CatalogConstants.PACKAGE_TYPES.Contains(value));
 
-        RuleFor(value => value.Sort).Must(value => new[] { "packageId", "-packageId", "displayName", "-updatedAt" }.Contains(value));
+        RuleFor(value => value.Sort).Must(value => CatalogConstants.PACKAGE_SORTS.Contains(value));
     }
 }

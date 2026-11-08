@@ -34,11 +34,12 @@ public sealed class DashboardRepository(ContextHubDbContext contextHubDbContext)
         }).OrderByDescending(value => value.TotalCount).ThenBy(value => value.ToolName).Take(TelemetryConstants.DASHBOARD_TOP_COUNT).ToArrayAsync(cancellationToken);
         var packageTotals = await (from item in usage
                                    join package in contextHubDbContext.Packages.AsNoTracking() on item.PackageId equals package.Id
-                                   group item by new { package.Key, package.Name } into aggregate
+                                   group item by new { package.Key, package.Name, package.Type } into aggregate
                                    select new
                                    {
                                        PackageId = aggregate.Key.Key,
                                        DisplayName = aggregate.Key.Name,
+                                       PackageType = aggregate.Key.Type,
                                        Total = aggregate.Sum(value => value.TotalCount),
                                        Errors = aggregate.Sum(value => value.ErrorCount)
                                    }).OrderByDescending(value => value.Total).ThenBy(value => value.PackageId).Take(TelemetryConstants.DASHBOARD_TOP_COUNT).ToArrayAsync(cancellationToken);
@@ -70,6 +71,7 @@ public sealed class DashboardRepository(ContextHubDbContext contextHubDbContext)
             TopPackages = packageTotals.Select(value => new DashboardPackageResponseDto {
                 PackageId = value.PackageId,
                 DisplayName = value.DisplayName,
+                PackageType = value.PackageType,
                 TotalCount = value.Total,
                 ErrorRate = value.Total > 0 ? (double)value.Errors / value.Total : 0
             }).ToArray()

@@ -47,6 +47,29 @@ public sealed class IntegrationRuntimeTests
     }
 
     /// <summary>
+    /// Refuses a deleted connection even when its configuration and warmed snapshot remain enabled.
+    /// </summary>
+    /// <returns>The stale-reference and non-dispatch assertions.</returns>
+    [Fact]
+    public async Task CachedReferenceDoesNotBypassSoftDeletedConnection()
+    {
+        using var services = CreateServices();
+        var repository = new ConnectionRepository();
+        var client = new NativeClient();
+        var registry = CreateRegistry(services, repository, client, ReviewedOptions());
+        var facade = CreateFacade(services, registry, client);
+        var search = await facade.SearchAsync("public reference", CancellationToken.None);
+        var reference = Assert.Single(search.GetProperty("candidates").EnumerateArray()).GetProperty("tool_ref").GetString()!;
+        repository.Connection.Status = ExternalMcpStatus.Deleted;
+
+        var response = await facade.CallAsync(reference, JsonSerializer.SerializeToElement(new { query = "public reference" }), CancellationToken.None);
+
+        Assert.Equal("managed_tool_definition_changed", response.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(1, client.DiscoveryCalls);
+        Assert.Equal(0, client.ToolCalls);
+    }
+
+    /// <summary>
     /// Re-discovers an exact definition before dispatch instead of trusting the cached search result.
     /// </summary>
     /// <returns>The drift rejection and non-dispatch assertions.</returns>

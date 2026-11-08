@@ -35,26 +35,52 @@ public sealed class ExecuteMcpToolQueryHandler(
             // A previously authenticated grant does not bypass a tool disabled since discovery.
             if (!await toolStateService.IsEnabledAsync(request.ToolName, cancellationToken))
             {
-                result = McpErrorFactory.Create(McpErrorConstants.TOOL_NOT_ENABLED, McpErrorConstants.CAPABILITY_UNAVAILABLE);
+                result = McpErrorFactory.Create(
+                    McpErrorConstants.TOOL_NOT_ENABLED,
+                    McpErrorConstants.CAPABILITY_UNAVAILABLE);
                 return result;
             }
 
             result = request.ToolName switch
             {
-                ToolCatalogConstants.CATALOG_SEARCH => ToObject(await catalogService.SearchAsync(Read<CatalogSearchRequestDto>(request.Arguments), cancellationToken)),
-                ToolCatalogConstants.PACKAGE_GET => await catalogService.GetPublicPackageAsync(Read<PackageLookupRequestDto>(request.Arguments), cancellationToken),
-                ToolCatalogConstants.BUNDLE_RESOLVE => await catalogService.ResolveAsync(Read<PackageLookupRequestDto>(request.Arguments), cancellationToken),
-                ToolCatalogConstants.COMPATIBILITY_CHECK => await catalogService.CheckCompatibilityAsync(Read<CompatibilityRequestDto>(request.Arguments), cancellationToken),
-                ToolCatalogConstants.REVOCATION_CHECK => await catalogService.GetRevocationsAsync(Read<RevocationRequestDto>(request.Arguments), cancellationToken),
-                ToolCatalogConstants.MANAGED_TOOL_SEARCH => ToObject(await managedToolService.SearchAsync(ReadString(request.Arguments, "need"), cancellationToken)),
-                ToolCatalogConstants.MANAGED_TOOL_DESCRIBE => ToObject(await managedToolService.DescribeAsync(ReadString(request.Arguments, "tool_ref"), cancellationToken)),
+                ToolCatalogConstants.CATALOG_SEARCH => ToObject((await catalogService.SearchAsync(
+                    Read<CatalogSearchRequestDto>(request.Arguments),
+                    cancellationToken)).Adapt<CatalogSearchResponseDto>()),
+                ToolCatalogConstants.PACKAGE_GET => await catalogService.GetPublicPackageAsync(
+                    Read<PackageLookupRequestDto>(request.Arguments),
+                    cancellationToken),
+                ToolCatalogConstants.BUNDLE_RESOLVE => await catalogService.ResolveAsync(
+                    Read<PackageLookupRequestDto>(request.Arguments),
+                    cancellationToken),
+                ToolCatalogConstants.COMPATIBILITY_CHECK => await catalogService.CheckCompatibilityAsync(
+                    Read<CompatibilityRequestDto>(request.Arguments),
+                    cancellationToken),
+                ToolCatalogConstants.REVOCATION_CHECK => await catalogService.GetRevocationsAsync(
+                    Read<RevocationRequestDto>(request.Arguments),
+                    cancellationToken),
+                ToolCatalogConstants.MANAGED_TOOL_SEARCH => ToObject(await managedToolService.SearchAsync(
+                    ReadString(
+                    request.Arguments,
+                    "need"),
+                    cancellationToken)),
+                ToolCatalogConstants.MANAGED_TOOL_DESCRIBE => ToObject(await managedToolService.DescribeAsync(
+                    ReadString(
+                    request.Arguments,
+                    "tool_ref"),
+                    cancellationToken)),
                 ToolCatalogConstants.MANAGED_TOOL_CALL => ToObject(await managedToolService.CallAsync(
                     ReadString(request.Arguments, "tool_ref"),
                     ReadObject(request.Arguments, "arguments"),
                     cancellationToken)),
-                ToolCatalogConstants.LIBRARY_DOCUMENTATION_SEARCH => ToObject(await managedToolService.DocumentationSearchAsync(ReadDocumentationArguments(request.Arguments), cancellationToken)),
-                ToolCatalogConstants.QUALITY_SIGNAL_SUBMIT => ToObject(await mediator.Send(new SubmitQualitySignalCommand(Read<QualitySignalRequestDto>(request.Arguments)), cancellationToken)),
-                _ => McpErrorFactory.Create(McpErrorConstants.VALIDATION_ERROR, McpErrorConstants.UNSUPPORTED_CAPABILITY)
+                ToolCatalogConstants.LIBRARY_DOCUMENTATION_SEARCH => ToObject(await managedToolService.DocumentationSearchAsync(
+                    ReadDocumentationArguments(request.Arguments),
+                    cancellationToken)),
+                ToolCatalogConstants.QUALITY_SIGNAL_SUBMIT => ToObject(await mediator.Send(
+                    new SubmitQualitySignalCommand(Read<QualitySignalRequestDto>(request.Arguments)),
+                    cancellationToken)),
+                _ => McpErrorFactory.Create(
+                    McpErrorConstants.VALIDATION_ERROR,
+                    McpErrorConstants.UNSUPPORTED_CAPABILITY)
             };
 
             return result;
@@ -95,7 +121,10 @@ public sealed class ExecuteMcpToolQueryHandler(
         }
         catch (QualitySignalRateLimitException)
         {
-            result = McpErrorFactory.Create(McpErrorConstants.RATE_LIMITED, McpErrorConstants.SUBMISSION_LIMIT_REACHED, true);
+            result = McpErrorFactory.Create(
+                McpErrorConstants.RATE_LIMITED,
+                McpErrorConstants.SUBMISSION_LIMIT_REACHED,
+                true);
             result["error"]!["details"] = new JsonObject
             {
                 ["retry_after_seconds"] = McpApplicationConstants.SIGNAL_RETRY_AFTER_SECONDS

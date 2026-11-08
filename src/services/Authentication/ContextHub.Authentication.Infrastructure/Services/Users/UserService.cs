@@ -73,7 +73,10 @@ public sealed class UserService(
                 }
 
                 // Identity checks the old password, enforces policy and updates the security stamp once.
-                var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+                var result = await userManager.ChangePasswordAsync(
+                    user,
+                    request.CurrentPassword,
+                    request.NewPassword);
                 if (!result.Succeeded)
                 {
                     logger.LogWarning(
@@ -132,7 +135,10 @@ public sealed class UserService(
                             error.Code == AuthenticationInfrastructureConstants.NATIVE_DUPLICATE_EMAIL);
                         var errorCode = duplicateEmail ? AuthenticationErrorConstants.ACCOUNT_EMAIL_CONFLICT
                             : AuthenticationErrorConstants.IDENTITY_OPERATION_REJECTED;
-                        logger.LogWarning(AuthenticationLogConstants.OPERATION_REJECTED, nameof(CreateAsync), errorCode);
+                        logger.LogWarning(
+                            AuthenticationLogConstants.OPERATION_REJECTED,
+                            nameof(CreateAsync),
+                            errorCode);
                         throw new BusinessException(
                             errorCode,
                             AuthenticationErrorConstants.ACCOUNT_OPERATION_REJECTED,
@@ -247,7 +253,9 @@ public sealed class UserService(
                 var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
 
                 // Protect the last active Owner only when this request would deactivate one; repeated no-op updates do not remove access again.
-                if (!request.IsActive && user.IsActive && await userManager.IsInRoleAsync(user, AuthenticationConstants.OWNER))
+                if (!request.IsActive && user.IsActive && await userManager.IsInRoleAsync(
+                    user,
+                    AuthenticationConstants.OWNER))
                 {
                     await EnsureAnotherOwnerAsync(id, token);
                 }
@@ -310,22 +318,24 @@ public sealed class UserService(
             {
                 // Keep the final-Owner check and membership changes inside the same locked transaction.
                 await userRepository.LockOwnerMembershipAsync(token);
-                await ValidateRolesAsync(request.RoleNames);
+                var requestedRoles = await userRepository.ResolveRoleNamesAsync(request.RoleIds, token);
                 var user = await RequireVersionAsync(id, request.ConcurrencyToken, token);
                 var current = await userManager.GetRolesAsync(user);
 
                 // Keep another active Owner when removing this account's Owner role.
                 if (user.IsActive && current.Contains(AuthenticationConstants.OWNER) &&
-                    !request.RoleNames.Contains(AuthenticationConstants.OWNER))
+                    !requestedRoles.Contains(AuthenticationConstants.OWNER))
                 {
                     await EnsureAnotherOwnerAsync(id, token);
                 }
 
                 // Membership order alone must not rewrite the account or revoke sessions.
-                if (!current.Order().SequenceEqual(request.RoleNames.Order()))
+                if (!current.Order().SequenceEqual(requestedRoles.Order()))
                 {
                     // Remove only memberships absent from the requested set.
-                    var roleRemovalResult = await userManager.RemoveFromRolesAsync(user, current.Except(request.RoleNames));
+                    var roleRemovalResult = await userManager.RemoveFromRolesAsync(
+                        user,
+                        current.Except(requestedRoles));
 
                     if (!roleRemovalResult.Succeeded)
                     {
@@ -339,7 +349,9 @@ public sealed class UserService(
                     }
 
                     // Commit membership additions and removals atomically.
-                    var roleAdditionResult = await userManager.AddToRolesAsync(user, request.RoleNames.Except(current));
+                    var roleAdditionResult = await userManager.AddToRolesAsync(
+                        user,
+                        requestedRoles.Except(current));
 
                     if (!roleAdditionResult.Succeeded)
                     {

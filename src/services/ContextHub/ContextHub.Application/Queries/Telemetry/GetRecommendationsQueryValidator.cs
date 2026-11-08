@@ -17,6 +17,6 @@ public sealed class GetRecommendationsQueryValidator : AbstractValidator<GetReco
         RuleFor(value => value.Request.Status).Must(value => value is null || TelemetryConstants.STATUSES.Contains(value));
         RuleFor(value => value.Request.RecommendationType).Must(value => value is null ||
             TelemetryConstants.MANUAL_TYPES.Contains(value) || value == "reliability_issue");
-        RuleFor(value => value.Request.Sort).Must(value => value is "createdAt" or "-createdAt" or "updatedAt" or "-updatedAt");
+        RuleFor(value => value.Request.Sort).Must(value => value is "createdAt" or "-createdAt" or "updatedAt" or "-updatedAt" or "signalCount" or "-signalCount");
     }
 }

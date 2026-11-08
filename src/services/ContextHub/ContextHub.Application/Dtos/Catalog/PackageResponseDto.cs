@@ -6,9 +6,14 @@ namespace ContextHub.Application.Dtos.Catalog;
 public sealed record PackageResponseDto
 {
     /// <summary>
-    /// Gets the stable public package identity, never the internal database UUID.
+    /// Gets the stable package UUID used by Owner operations.
     /// </summary>
-    public string PackageId { get; init; } = "";
+    public Guid PackageId { get; init; }
+
+    /// <summary>
+    /// Gets the immutable public catalog key, independently of the Owner UUID.
+    /// </summary>
+    public string Key { get; init; } = "";
 
     /// <summary>
     /// Gets the closed package-kind vocabulary value.

@@ -145,7 +145,7 @@ public sealed class IntegrationDependencyFailureTests
             })
         };
 
-        var failure = await Assert.ThrowsAsync<DependencyUnavailableException>(() => service.SaveAsync("provider", request, CancellationToken.None));
+        var failure = await Assert.ThrowsAsync<DependencyUnavailableException>(() => service.CreateAsync(new CreateExternalMcpRequestDto { Name = "provider", Config = request.Config }, CancellationToken.None));
 
         Assert.IsAssignableFrom<SocketException>(failure.InnerException);
         Assert.Equal(0, repository.Calls);

@@ -11,7 +11,9 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<PageResponse<PackageResponseDto>> GetPackagesAsync(PackageListRequestDto request, CancellationToken cancellationToken);
+    Task<PageResponse<PackageResponseDto>> GetPackagesAsync(
+        PackageListRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets the current Owner-visible identity and concurrency metadata.
@@ -19,7 +21,7 @@ public interface ICatalogService
     /// <param name="packageId">The canonical public package identity; internal UUIDs are never exposed.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<PackageResponseDto> GetPackageDetailAsync(string packageId, CancellationToken cancellationToken);
+    Task<PackageResponseDto> GetPackageDetailAsync(Guid packageId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Creates a stable package identity without publishing content.
@@ -27,7 +29,9 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<PackageResponseDto> CreatePackageAsync(CreatePackageRequestDto request, CancellationToken cancellationToken);
+    Task<PackageResponseDto> CreatePackageAsync(
+        CreatePackageRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Updates only editable metadata while preserving stable identity.
@@ -36,7 +40,10 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<PackageResponseDto> UpdatePackageAsync(string packageId, UpdatePackageRequestDto request, CancellationToken cancellationToken);
+    Task<PackageResponseDto> UpdatePackageAsync(
+        Guid packageId,
+        UpdatePackageRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Lists release metadata without loading source content into each response row.
@@ -45,7 +52,10 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<PageResponse<VersionSummaryResponseDto>> GetVersionsAsync(string packageId, VersionListRequestDto request, CancellationToken cancellationToken);
+    Task<PageResponse<VersionSummaryResponseDto>> GetVersionsAsync(
+        Guid packageId,
+        VersionListRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets exact Owner-only immutable content and live lifecycle metadata.
@@ -54,7 +64,10 @@ public interface ICatalogService
     /// <param name="version">The exact canonical stable release, without ranges or build metadata.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<VersionResponseDto> GetVersionAsync(string packageId, string version, CancellationToken cancellationToken);
+    Task<VersionResponseDto> GetVersionAsync(
+        Guid packageId,
+        string version,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Evaluates exact source content without staging or saving database records.
@@ -63,7 +76,10 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<PackagePreviewResponseDto> PreviewAsync(string packageId, PublishVersionRequestDto request, CancellationToken cancellationToken);
+    Task<PackagePreviewResponseDto> PreviewAsync(
+        Guid packageId,
+        PublishVersionRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Publishes reviewed immutable content after transaction-time dependency checks.
@@ -72,7 +88,10 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<VersionResponseDto> PublishAsync(string packageId, PublishVersionRequestDto request, CancellationToken cancellationToken);
+    Task<VersionResponseDto> PublishAsync(
+        Guid packageId,
+        PublishVersionRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Marks a release deprecated without changing its immutable content.
@@ -83,7 +102,7 @@ public interface ICatalogService
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
     Task<VersionResponseDto> DeprecateAsync(
-        string packageId,
+        Guid packageId,
         string version,
         LifecycleVersionRequestDto request,
         CancellationToken cancellationToken);
@@ -97,7 +116,7 @@ public interface ICatalogService
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
     Task<VersionResponseDto> RevokeAsync(
-        string packageId,
+        Guid packageId,
         string version,
         LifecycleVersionRequestDto request,
         CancellationToken cancellationToken);
@@ -108,7 +127,9 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<CatalogSearchResponseDto> SearchAsync(CatalogSearchRequestDto request, CancellationToken cancellationToken);
+    Task<CatalogSearchResultModel> SearchAsync(
+        CatalogSearchRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets only allowlisted consumer metadata after lifecycle and closure checks.
@@ -116,7 +137,9 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<JsonObject> GetPublicPackageAsync(PackageLookupRequestDto request, CancellationToken cancellationToken);
+    Task<JsonObject> GetPublicPackageAsync(
+        PackageLookupRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Returns a complete exact dependency closure in deterministic dependency order.
@@ -132,7 +155,9 @@ public interface ICatalogService
     /// <param name="request">The operation-specific input validated by the Application pipeline.</param>
     /// <param name="cancellationToken">Cancels the owned I/O and transaction work.</param>
     /// <returns>The current contract projection; unavailable or disallowed content remains an explicit failure.</returns>
-    Task<JsonObject> CheckCompatibilityAsync(CompatibilityRequestDto request, CancellationToken cancellationToken);
+    Task<JsonObject> CheckCompatibilityAsync(
+        CompatibilityRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Checks live revocation metadata for one selected release.
@@ -155,7 +180,9 @@ public interface ICatalogService
     /// <param name="request">The exact resource identity.</param>
     /// <param name="cancellationToken">Cancels the authoritative read.</param>
     /// <returns>The validated public bundle.</returns>
-    Task<JsonObject> GetPublicContentAsync(PackageLookupRequestDto request, CancellationToken cancellationToken);
+    Task<JsonObject> GetPublicContentAsync(
+        PackageLookupRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Returns public requirements for the selected exact resource.
@@ -163,7 +190,9 @@ public interface ICatalogService
     /// <param name="request">The exact package resource identity.</param>
     /// <param name="cancellationToken">Cancels the authoritative read.</param>
     /// <returns>The public capability requirements.</returns>
-    Task<JsonObject> GetRequirementsAsync(PackageLookupRequestDto request, CancellationToken cancellationToken);
+    Task<JsonObject> GetRequirementsAsync(
+        PackageLookupRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Lists only public metadata for revoked package releases.

@@ -3,8 +3,13 @@ namespace ContextHub.Application.Dtos.Mcp;
 /// <summary>
 /// Contains fixed tool metadata and authoritative live state.
 /// </summary>
-public sealed record McpToolResponseDto
+public record McpToolResponseDto
 {
+    /// <summary>
+    /// Gets the stable database identity used only by Owner operations.
+    /// </summary>
+    public Guid ToolId { get; init; }
+
     /// <summary>
     /// Gets the public leaf name.
     /// </summary>

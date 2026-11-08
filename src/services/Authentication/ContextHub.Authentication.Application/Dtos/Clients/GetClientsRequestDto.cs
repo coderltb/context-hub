@@ -6,6 +6,16 @@ namespace ContextHub.Authentication.Application.Dtos.Clients;
 public sealed class GetClientsRequestDto
 {
     /// <summary>
+    /// Gets the optional case-insensitive display-name query.
+    /// </summary>
+    public string? Query { get; init; }
+
+    /// <summary>
+    /// Gets the optional current client status filter.
+    /// </summary>
+    public bool? IsActive { get; init; }
+
+    /// <summary>
     /// Gets or sets the one-based page number; omitted requests use page 1.
     /// </summary>
     /// <example>1</example>

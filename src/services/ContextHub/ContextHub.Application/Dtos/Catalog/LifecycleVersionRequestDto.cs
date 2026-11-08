@@ -6,7 +6,7 @@ namespace ContextHub.Application.Dtos.Catalog;
 public sealed record LifecycleVersionRequestDto
 {
     /// <summary>
-    /// Gets the optional existing non-revoked release suggested as a replacement.
+    /// Gets an optional different published SemVer from this package.
     /// </summary>
     public string? ReplacementVersion { get; init; }
 

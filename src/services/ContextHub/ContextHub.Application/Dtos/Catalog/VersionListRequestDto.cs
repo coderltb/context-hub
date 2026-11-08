@@ -23,5 +23,5 @@ public sealed record VersionListRequestDto
     /// <summary>
     /// Gets the allowlisted administrative ordering, independent of ranked search.
     /// </summary>
-    public string Sort { get; init; } = "-publishedAt";
+    public string Sort { get; init; } = CatalogConstants.PUBLISHED_AT_DESCENDING_SORT;
 }

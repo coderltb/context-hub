@@ -6,6 +6,14 @@ namespace ContextHub.Application.Interfaces.Mcp;
 public interface IToolStateService
 {
     /// <summary>
+    /// Reads one stored tool including both schemas, even when it is disabled.
+    /// </summary>
+    /// <param name="toolId">The immutable Owner-facing identity.</param>
+    /// <param name="cancellationToken">Cancels the database read.</param>
+    /// <returns>The current configuration.</returns>
+    Task<McpToolDetailResponseDto> GetAsync(Guid toolId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Reads current input and output contracts together without caching authority.
     /// </summary>
     /// <param name="toolName">The selected name, or null for the fixed catalog.</param>
@@ -27,17 +35,20 @@ public interface IToolStateService
     /// </summary>
     /// <param name="cancellationToken">Cancels the owned database or coordination operation.</param>
     /// <returns>The completed operation or approved result.</returns>
-    Task<McpToolsResponseDto> GetListAsync(CancellationToken cancellationToken);
+    /// <param name="request">The bounded metadata filters and page.</param>
+    Task<PageResponse<McpToolResponseDto>> GetListAsync(
+        GetMcpToolsRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Updates global enablement with optimistic concurrency.
     /// </summary>
-    /// <param name="toolName">The approved toolName input.</param>
+    /// <param name="toolId">The approved toolName input.</param>
     /// <param name="request">The approved request input.</param>
     /// <param name="cancellationToken">Cancels the owned database or coordination operation.</param>
     /// <returns>The completed operation or approved result.</returns>
     Task<McpToolResponseDto> UpdateAsync(
-        string toolName,
+        Guid toolId,
         UpdateMcpToolRequestDto request,
         CancellationToken cancellationToken);
 

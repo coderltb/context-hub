@@ -13,6 +13,11 @@ public sealed class AuthenticationOptions
     public string Issuer { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the deployed Owner Console URL linked from the SSO home page.
+    /// </summary>
+    public string ConsoleUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the Base64-encoded external HMAC key used for client credentials.
     /// </summary>
     public string ClientTokenPepper { get; set; } = "";

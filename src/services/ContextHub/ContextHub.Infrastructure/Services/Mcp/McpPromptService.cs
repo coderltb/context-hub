@@ -34,8 +34,13 @@ public sealed class McpPromptService(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var prompt = await mcpPromptRepository.FirstOrDefaultAsync<McpPrompt>(predicate: value => value.Id == id, cancellationToken: cancellationToken)
-            ?? throw new BusinessException(McpPromptConstants.NOT_FOUND, McpPromptConstants.NOT_FOUND_MESSAGE, BusinessErrorKind.NotFound);
+        var prompt = await mcpPromptRepository.FirstOrDefaultAsync<McpPrompt>(
+            predicate: value => value.Id == id,
+            cancellationToken: cancellationToken)
+            ?? throw new BusinessException(
+                McpPromptConstants.NOT_FOUND,
+                McpPromptConstants.NOT_FOUND_MESSAGE,
+                BusinessErrorKind.NotFound);
 
         return prompt.Adapt<McpPromptResponseDto>() with { Arguments = jsonSerializerService.DeserializeList<McpPromptArgumentDto>(prompt.Arguments) };
     }
@@ -51,7 +56,8 @@ public sealed class McpPromptService(
         CancellationToken cancellationToken)
     {
         var prompt = request.Adapt<McpPrompt>();
-        prompt.Arguments = jsonSerializerService.Serialize(request.Arguments);
+        var arguments = McpPromptArgumentPolicy.Merge([], request.Arguments, []);
+        prompt.Arguments = jsonSerializerService.Serialize(arguments);
         await mcpPromptRepository.AddAsync(prompt, cancellationToken);
 
         try
@@ -63,10 +69,13 @@ public sealed class McpPromptService(
         {
             // Only the known name constraint represents a public creation conflict.
             logger.LogWarning(TelemetryLogConstants.CONCURRENCY_REJECTED, nameof(CreateAsync));
-            throw new BusinessException(McpPromptConstants.CONFLICT, McpPromptConstants.CONFLICT_MESSAGE, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                McpPromptConstants.CONFLICT,
+                McpPromptConstants.CONFLICT_MESSAGE,
+                BusinessErrorKind.Conflict);
         }
 
-        return prompt.Adapt<McpPromptResponseDto>() with { Arguments = request.Arguments.Select(value => value!).ToArray() };
+        return prompt.Adapt<McpPromptResponseDto>() with { Arguments = arguments };
     }
 
     /// <summary>
@@ -82,27 +91,42 @@ public sealed class McpPromptService(
         CancellationToken cancellationToken)
     {
         var expected = PersistenceConcurrencyHelper.Decode(request.ConcurrencyToken);
-        var prompt = await mcpPromptRepository.FirstOrDefaultAsync(value => value.Id == id, cancellationToken: cancellationToken)
-            ?? throw new BusinessException(McpPromptConstants.NOT_FOUND, McpPromptConstants.NOT_FOUND_MESSAGE, BusinessErrorKind.NotFound);
+        var prompt = await mcpPromptRepository.FirstOrDefaultAsync(
+            value => value.Id == id,
+            cancellationToken: cancellationToken)
+            ?? throw new BusinessException(
+                McpPromptConstants.NOT_FOUND,
+                McpPromptConstants.NOT_FOUND_MESSAGE,
+                BusinessErrorKind.NotFound);
         if (prompt.ConcurrencyVersion != expected)
         {
-            throw new BusinessException(McpPromptConstants.CONFLICT, McpPromptConstants.CONFLICT_MESSAGE, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                McpPromptConstants.CONFLICT,
+                McpPromptConstants.CONFLICT_MESSAGE,
+                BusinessErrorKind.Conflict);
         }
 
+        var stored = jsonSerializerService.DeserializeList<McpPromptArgumentDto>(prompt.Arguments);
+        var arguments = McpPromptArgumentPolicy.Merge(stored, request.Arguments, request.RemovedArgumentIds);
         request.Adapt(prompt);
-        prompt.Arguments = jsonSerializerService.Serialize(request.Arguments);
+        prompt.Arguments = jsonSerializerService.Serialize(arguments);
 
         try
         {
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateConcurrencyException exception) when (exception.Entries.Count == 1 && ReferenceEquals(exception.Entries[0].Entity, prompt))
+        catch (DbUpdateConcurrencyException exception) when (exception.Entries.Count == 1 && ReferenceEquals(
+            exception.Entries[0].Entity,
+            prompt))
         {
             logger.LogWarning(TelemetryLogConstants.CONCURRENCY_REJECTED, nameof(UpdateAsync));
-            throw new BusinessException(McpPromptConstants.CONFLICT, McpPromptConstants.CONFLICT_MESSAGE, BusinessErrorKind.Conflict);
+            throw new BusinessException(
+                McpPromptConstants.CONFLICT,
+                McpPromptConstants.CONFLICT_MESSAGE,
+                BusinessErrorKind.Conflict);
         }
 
-        return prompt.Adapt<McpPromptResponseDto>() with { Arguments = request.Arguments.Select(value => value!).ToArray() };
+        return prompt.Adapt<McpPromptResponseDto>() with { Arguments = arguments };
     }
 
     /// <summary>
@@ -118,7 +142,7 @@ public sealed class McpPromptService(
             cancellationToken: cancellationToken);
         return prompts.Select(prompt => prompt.Adapt<McpPromptModel>() with
         {
-            Arguments = jsonSerializerService.DeserializeList<McpPromptArgumentDto>(prompt.Arguments)
+            Arguments = jsonSerializerService.DeserializeList<McpPromptArgumentDto>(prompt.Arguments).Where(value => !value.IsDeleted).ToArray()
         }).ToArray();
     }
 
@@ -137,7 +161,8 @@ public sealed class McpPromptService(
             cancellationToken: cancellationToken);
         return prompt is null ? null : prompt.Adapt<McpPromptModel>() with
         {
-            Arguments = jsonSerializerService.DeserializeList<McpPromptArgumentDto>(prompt.Arguments)
+            Arguments = jsonSerializerService.DeserializeList<McpPromptArgumentDto>(prompt.Arguments).Where(value => !value.IsDeleted).ToArray()
         };
     }
+
 }

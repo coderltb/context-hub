@@ -99,7 +99,7 @@ public sealed class ExternalToolRegistry(
             return null;
         }
         var connection = await connectionRepository.GetByIdAsync(route.ConnectionId, cancellationToken);
-        if (connection is null || Hash(connection.Config) != route.ConfigHash)
+        if (connection is null || connection.Status != ExternalMcpStatus.Active || Hash(connection.Config) != route.ConfigHash)
         {
             return null;
         }
@@ -124,7 +124,9 @@ public sealed class ExternalToolRegistry(
         ExternalMcp connection,
         CancellationToken cancellationToken)
     {
-        var snapshot = await cacheService.GetAsync<ExternalDiscoveryModel>(SnapshotKey(connection.Id), cancellationToken);
+        var snapshot = await cacheService.GetAsync<ExternalDiscoveryModel>(
+            SnapshotKey(connection.Id),
+            cancellationToken);
         if (snapshot is null || snapshot.ConfigHash != Hash(connection.Config) || snapshot.RefreshedAt.AddMinutes(IntegrationInfrastructureConstants.SNAPSHOT_LIFETIME_MINUTES) <= DateTimeOffset.UtcNow)
         {
             return new();
@@ -180,7 +182,9 @@ public sealed class ExternalToolRegistry(
     {
         var hash = Hash(connection.Config);
         var key = SnapshotKey(connection.Id);
-        var cached = refresh ? null : await cacheService.GetAsync<ExternalDiscoveryModel>(key, cancellationToken);
+        var cached = refresh ? null : await cacheService.GetAsync<ExternalDiscoveryModel>(
+            key,
+            cancellationToken);
         if (cached is not null && cached.ConfigHash == hash && cached.RefreshedAt.AddMinutes(IntegrationInfrastructureConstants.SNAPSHOT_LIFETIME_MINUTES) > DateTimeOffset.UtcNow)
         {
             return cached;
@@ -191,7 +195,9 @@ public sealed class ExternalToolRegistry(
         {
             var review = Qualify(connection.Name, config, tool);
             var embedding = review is { } approved
-                ? await embeddingService.EncodePassageAsync(approved.Review.Title + " " + approved.Review.Summary, cancellationToken)
+                ? await embeddingService.EncodePassageAsync(
+                    approved.Review.Title + " " + approved.Review.Summary,
+                    cancellationToken)
                 : null;
             tools.Add(tool with {
                 Embedding = embedding?.Values,
@@ -221,7 +227,9 @@ public sealed class ExternalToolRegistry(
         ExternalMcpConfigDto config,
         ExternalToolModel tool)
     {
-        if (!tool.ReadOnlyHint || config.ToolPolicy.Mode == "allowlist" && !config.ToolPolicy.Tools!.Contains(tool.Name, StringComparer.Ordinal))
+        if (!tool.ReadOnlyHint || config.ToolPolicy.Mode == "allowlist" && !config.ToolPolicy.Tools!.Contains(
+            tool.Name,
+            StringComparer.Ordinal))
         {
             return null;
         }

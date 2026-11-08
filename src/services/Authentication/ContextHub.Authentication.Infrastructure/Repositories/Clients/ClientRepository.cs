@@ -20,11 +20,27 @@ public class ClientRepository(
     /// <returns>The approved application page.</returns>
     public virtual Task<PageResponse<ClientResponseDto>> GetPageAsync(
         GetClientsRequestDto request,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken)
+    {
+        var query = request.Query?.Trim();
+        var hasId = Guid.TryParseExact(query, "D", out var clientId);
+
+        // Use the same identity predicate for the count and page queries.
+        return
         GetPageAsync<ClientResponseDto>(
             new PageRequest(request.Page, request.PageSize),
             QueryOrder<Client>.By(value => value.Name).ThenBy(value => value.Id),
+            search: new SearchOptions<Client>
+            {
+                SearchTerm = hasId ? null : query?.ToLowerInvariant(),
+                TextFields = [value => value.Name.ToLower()],
+                FieldFilters = [
+                    request.IsActive is { } active ? value => value.IsActive == active : null,
+                    hasId ? value => value.Id == clientId : null
+                ]
+            },
             cancellationToken: cancellationToken);
+    }
 
     /// <summary>
     /// Gets public detail without leaking digests or the internal persistence model.
@@ -36,7 +52,9 @@ public class ClientRepository(
         Guid clientId,
         CancellationToken cancellationToken)
     {
-        var client = await FirstOrDefaultAsync<ClientResponseDto>(predicate: value => value.Id == clientId, cancellationToken: cancellationToken);
+        var client = await FirstOrDefaultAsync<ClientResponseDto>(
+            predicate: value => value.Id == clientId,
+            cancellationToken: cancellationToken);
 
         if (client is null)
         {
@@ -57,7 +75,9 @@ public class ClientRepository(
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The model, or null.</returns>
     public virtual Task<ClientModel?> GetAsync(Guid clientId, CancellationToken cancellationToken) =>
-        FirstOrDefaultAsync<ClientModel>(predicate: value => value.Id == clientId, cancellationToken: cancellationToken);
+        FirstOrDefaultAsync<ClientModel>(
+            predicate: value => value.Id == clientId,
+            cancellationToken: cancellationToken);
 
     /// <summary>
     /// Keeps credential lookup scoped to the supplied application.
@@ -79,7 +99,9 @@ public class ClientRepository(
     /// <param name="tokenId">The parsed public credential identifier.</param>
     /// <param name="cancellationToken">Cancels the database query.</param>
     /// <returns>The internal digest and metadata, or null when current database state forbids access.</returns>
-    public virtual Task<ClientTokenModel?> GetValidTokenAsync(Guid tokenId, CancellationToken cancellationToken) =>
+    public virtual Task<ClientTokenModel?> GetValidTokenAsync(
+        Guid tokenId,
+        CancellationToken cancellationToken) =>
         authenticationDbContext.ClientTokens.AsNoTracking()
             // Null expiry is unlimited; revocation and parent status still apply on every lookup.
             .Where(value => value.Id == tokenId && value.RevokedAt == null && value.Client.IsActive &&

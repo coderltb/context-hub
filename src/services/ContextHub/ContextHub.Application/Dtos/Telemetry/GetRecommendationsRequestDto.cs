@@ -31,7 +31,7 @@ public sealed record GetRecommendationsRequestDto
     public string? Status { get; init; }
 
     /// <summary>
-    /// Gets the allowlisted timestamp ordering.
+    /// Gets timestamp or signal-count ordering with stable identity tie-breaking.
     /// </summary>
     public string Sort { get; init; } = "-createdAt";
 }

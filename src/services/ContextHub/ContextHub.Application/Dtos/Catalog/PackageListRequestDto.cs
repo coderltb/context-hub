@@ -33,5 +33,5 @@ public sealed record PackageListRequestDto
     /// <summary>
     /// Gets the allowlisted administrative ordering, independent of ranked search.
     /// </summary>
-    public string Sort { get; init; } = "packageId";
+    public string Sort { get; init; } = CatalogConstants.PACKAGE_KEY_SORT;
 }

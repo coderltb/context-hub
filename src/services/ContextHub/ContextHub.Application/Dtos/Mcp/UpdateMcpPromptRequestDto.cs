@@ -6,6 +6,11 @@ namespace ContextHub.Application.Dtos.Mcp;
 public sealed record UpdateMcpPromptRequestDto
 {
     /// <summary>
+    /// Gets saved argument IDs explicitly removed by this atomic update.
+    /// </summary>
+    public IReadOnlyList<Guid> RemovedArgumentIds { get; init; } = [];
+
+    /// <summary>
     /// Gets the optional display title.
     /// </summary>
     public string? Title { get; init; }

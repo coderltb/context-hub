@@ -13,6 +13,10 @@ public sealed class UpdateMcpPromptCommandValidator : AbstractValidator<UpdateMc
         RuleFor(value => value.Id).NotEmpty();
         RuleFor(value => value.Request.ConcurrencyToken).NotEmpty().MaximumLength(32);
 
+        RuleFor(value => value.Request.RemovedArgumentIds).NotNull()
+            .Must(ids => ids is null || ids.Distinct().Count() == ids.Count);
+        RuleForEach(value => value.Request.RemovedArgumentIds).NotEmpty();
+
         RuleFor(value => value.Request.Content).NotEmpty();
         RuleFor(value => value.Request.Arguments).NotNull()
             .Must(values => values is null || values.All(value => value is not null) &&

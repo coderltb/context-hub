@@ -21,20 +21,36 @@ public interface IExternalMcpService
     Task<ExternalMcpListResponseDto> GetListAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Saves a canonical configuration using optimistic concurrency.
+    /// Creates one new canonical connection without implicit update behavior.
     /// </summary>
-    /// <param name="name">The Owner-only connection label.</param>
-    /// <param name="request">The canonical configuration and expected version.</param>
+    /// <param name="request">The name and canonical configuration.</param>
     /// <param name="cancellationToken">Cancels validation and persistence.</param>
-    /// <returns>The committed canonical metadata.</returns>
-    Task<ExternalMcpResponseDto> SaveAsync(string name, SaveExternalMcpRequestDto request, CancellationToken cancellationToken);
+    /// <returns>The committed connection identity and safe configuration.</returns>
+    Task<ExternalMcpResponseDto> CreateAsync(
+        CreateExternalMcpRequestDto request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Updates only the selected existing connection UUID.
+    /// </summary>
+    /// <param name="connectionId">The stored connection identity.</param>
+    /// <param name="request">The editable label, configuration and version.</param>
+    /// <param name="cancellationToken">Cancels validation and persistence.</param>
+    /// <returns>The committed safe Owner projection.</returns>
+    Task<ExternalMcpResponseDto> SaveAsync(
+        Guid connectionId,
+        SaveExternalMcpRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Deletes a connection and invalidates derived discovery references.
     /// </summary>
-    /// <param name="name">The exact saved connection label.</param>
+    /// <param name="connectionId">The exact saved connection label.</param>
     /// <param name="concurrencyToken">The opaque current version.</param>
     /// <param name="cancellationToken">Cancels persistence and cache invalidation.</param>
     /// <returns>The completed deletion result.</returns>
-    Task<DeletedIntegrationResponseDto> DeleteAsync(string name, string concurrencyToken, CancellationToken cancellationToken);
+    Task<DeletedIntegrationResponseDto> DeleteAsync(
+        Guid connectionId,
+        string concurrencyToken,
+        CancellationToken cancellationToken);
 }

@@ -22,7 +22,9 @@ public class UserRepository(
     {
         if (!request.Sort.TryParseUserSort(out var fields))
         {
-            throw new BusinessException(AuthenticationErrorConstants.INVALID_SORT, AuthenticationErrorConstants.INVALID_SORT_MESSAGE);
+            throw new BusinessException(
+                AuthenticationErrorConstants.INVALID_SORT,
+                AuthenticationErrorConstants.INVALID_SORT_MESSAGE);
         }
 
         QueryOrder<User>? order = null;
@@ -31,11 +33,26 @@ public class UserRepository(
             // Public aliases are explicitly mapped to typed selectors; no consumer property path enters EF.
             order = field.Field switch
             {
-                AuthenticationQueryConstants.USER_NAME => AppendOrder(order, value => value.UserName, field.Descending),
-                AuthenticationQueryConstants.EMAIL => AppendOrder(order, value => value.Email, field.Descending),
-                AuthenticationQueryConstants.IS_ACTIVE => AppendOrder(order, value => value.IsActive, field.Descending),
-                AuthenticationQueryConstants.CREATED_AT => AppendOrder(order, value => value.CreatedAt, field.Descending),
-                AuthenticationQueryConstants.UPDATED_AT => AppendOrder(order, value => value.UpdatedAt, field.Descending),
+                AuthenticationQueryConstants.USER_NAME => AppendOrder(
+                    order,
+                    value => value.UserName,
+                    field.Descending),
+                AuthenticationQueryConstants.EMAIL => AppendOrder(
+                    order,
+                    value => value.Email,
+                    field.Descending),
+                AuthenticationQueryConstants.IS_ACTIVE => AppendOrder(
+                    order,
+                    value => value.IsActive,
+                    field.Descending),
+                AuthenticationQueryConstants.CREATED_AT => AppendOrder(
+                    order,
+                    value => value.CreatedAt,
+                    field.Descending),
+                AuthenticationQueryConstants.UPDATED_AT => AppendOrder(
+                    order,
+                    value => value.UpdatedAt,
+                    field.Descending),
                 _ => throw new InvalidOperationException(AuthenticationErrorConstants.UNSUPPORTED_PARSED_SORT_FIELD)
             };
         }
@@ -49,7 +66,11 @@ public class UserRepository(
             TextFields = [value => value.UserName, value => value.Email],
             FieldFilters = [request.IsActive is { } active ? value => value.IsActive == active : null]
         };
-        var result = await GetPageAsync<UserResponseDto>(page, order, search: search, cancellationToken: cancellationToken);
+        var result = await GetPageAsync<UserResponseDto>(
+            page,
+            order,
+            search: search,
+            cancellationToken: cancellationToken);
 
         // An empty page has no memberships to enrich, even when earlier pages contain users.
         if (result.Items.Count == 0)
@@ -63,15 +84,16 @@ public class UserRepository(
         var memberships = await (from membership in authenticationDbContext.UserRoles.AsNoTracking()
                                  join role in authenticationDbContext.Roles on membership.RoleId equals role.Id
                                  where ids.Contains(membership.UserId)
-                                 select new { membership.UserId, role.Name }).ToListAsync(cancellationToken);
+                                 select new { membership.UserId, RoleId = role.Id, role.Name }).ToListAsync(cancellationToken);
 
         // Index the buffered memberships once instead of scanning them again for every user.
-        var rolesByUser = memberships.ToLookup(value => value.UserId, value => value.Name!);
+        var rolesByUser = memberships.ToLookup(value => value.UserId);
 
         return new(
             result.Items.Select(user => user with
             {
-                Roles = rolesByUser[user.Id].ToArray()
+                Roles = rolesByUser[user.Id].Select(value => value.Name!).ToArray(),
+                RoleIds = rolesByUser[user.Id].Select(value => value.RoleId).ToArray()
             }).ToArray(),
             page,
             result.TotalCount);
@@ -84,7 +106,10 @@ public class UserRepository(
     /// <param name="sessionId">The protected session identifier.</param>
     /// <param name="cancellationToken">Cancels the read, including inside a Serializable grant transaction.</param>
     /// <returns>Whether the native token store contains a logout marker.</returns>
-    public virtual Task<bool> IsSessionRevokedAsync(Guid userId, string sessionId, CancellationToken cancellationToken) =>
+    public virtual Task<bool> IsSessionRevokedAsync(
+        Guid userId,
+        string sessionId,
+        CancellationToken cancellationToken) =>
         authenticationDbContext.UserTokens.AsNoTracking().AnyAsync(
             value => value.UserId == userId && value.LoginProvider == AuthenticationInfrastructureConstants.SSO_REVOCATION_PROVIDER &&
                 value.Name == sessionId,
@@ -100,7 +125,9 @@ public class UserRepository(
         Guid id,
         CancellationToken cancellationToken)
     {
-        var user = await FirstOrDefaultAsync<UserResponseDto>(predicate: value => value.Id == id, cancellationToken: cancellationToken);
+        var user = await FirstOrDefaultAsync<UserResponseDto>(
+            predicate: value => value.Id == id,
+            cancellationToken: cancellationToken);
 
         if (user is null)
         {
@@ -110,9 +137,9 @@ public class UserRepository(
         var names = await (from membership in authenticationDbContext.UserRoles
                            join role in authenticationDbContext.Roles on membership.RoleId equals role.Id
                            where membership.UserId == id
-                           select role.Name!).ToArrayAsync(cancellationToken);
+                           select new { role.Id, role.Name }).ToArrayAsync(cancellationToken);
 
-        return user with { Roles = names };
+        return user with { Roles = names.Select(role => role.Name!).ToArray(), RoleIds = names.Select(role => role.Id).ToArray() };
     }
 
     /// <summary>
@@ -152,7 +179,9 @@ public class UserRepository(
     /// <param name="cancellationToken">Cancels lock acquisition.</param>
     /// <returns>The asynchronous lock acquisition.</returns>
     public virtual async Task LockOwnerMembershipAsync(CancellationToken cancellationToken) =>
-        _ = await authenticationDbContext.Roles.FromSqlRaw(AuthenticationSqlConstants.LOCK_OWNER_ROLE, AuthenticationConstants.OWNER.ToUpperInvariant())
+        _ = await authenticationDbContext.Roles.FromSqlRaw(
+            AuthenticationSqlConstants.LOCK_OWNER_ROLE,
+            AuthenticationConstants.OWNER.ToUpperInvariant())
             .SingleAsync(cancellationToken);
 
     /// <summary>
@@ -167,6 +196,28 @@ public class UserRepository(
             authenticationDbContext.UserRoles.Any(membership => membership.UserId == user.Id &&
                 authenticationDbContext.Roles.Any(role => role.Id == membership.RoleId && role.Name == AuthenticationConstants.OWNER)),
             cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// Resolves a complete UUID selection inside the membership transaction.
+    /// </summary>
+    /// <param name="ids">The requested provisioned role IDs.</param>
+    /// <param name="cancellationToken">Cancels the role lookup.</param>
+    /// <returns>The native Identity role names for the verified selection.</returns>
+    public virtual async Task<string[]> ResolveRoleNamesAsync(
+        Guid[] ids,
+        CancellationToken cancellationToken)
+    {
+        var roles = await authenticationDbContext.Roles.AsNoTracking()
+            .Where(role => ids.Contains(role.Id)).Select(role => role.Name!).ToArrayAsync(cancellationToken);
+        if (roles.Length != ids.Length)
+        {
+            throw new BusinessException(
+                AuthenticationErrorConstants.ROLES_INVALID,
+                AuthenticationErrorConstants.INVALID_ROLE_SELECTION);
+        }
+
+        return roles;
+    }
 
     /// <summary>
     /// Preserves each key's CLR type while appending the requested direction to an immutable order chain.

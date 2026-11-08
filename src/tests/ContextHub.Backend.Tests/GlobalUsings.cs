@@ -327,3 +327,6 @@ global using ModelContextProtocol.Client;
 global using ModelContextProtocol.Protocol;
 global using AuthenticationProtocolFixture = ContextHub.Backend.Tests.Services.Authentication.AuthenticationProtocolPostgreSqlTests;
 global using HubApiRegistration = ContextHub.Api.DependencyInjection.ApiServiceRegistration;
+
+global using ContextHub.Application.Policies.Mcp;
+global using ContextHub.Domain.Enums;

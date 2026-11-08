@@ -11,7 +11,9 @@ public interface IUserRepository : IGenericRepository<User>
     /// <param name="request">The grouped public list inputs.</param>
     /// <param name="cancellationToken">Cancels the sequential reads.</param>
     /// <returns>The approved account page.</returns>
-    Task<PageResponse<UserResponseDto>> GetPageAsync(GetUsersRequestDto request, CancellationToken cancellationToken);
+    Task<PageResponse<UserResponseDto>> GetPageAsync(
+        GetUsersRequestDto request,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets one approved account projection.
@@ -34,7 +36,9 @@ public interface IUserRepository : IGenericRepository<User>
     /// <param name="subject">The authenticated protocol subject.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The minimal account model, or null for an invalid or no-longer-permitted subject.</returns>
-    Task<UserAccountModel?> GetPermittedUserAsync(string? subject, CancellationToken cancellationToken = default);
+    Task<UserAccountModel?> GetPermittedUserAsync(
+        string? subject,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Reads the exact native Identity logout marker without using tracked token state.
@@ -51,6 +55,14 @@ public interface IUserRepository : IGenericRepository<User>
     /// <param name="cancellationToken">Cancels lock acquisition.</param>
     /// <returns>The completed lock acquisition.</returns>
     Task LockOwnerMembershipAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Resolves provisioned role names from the complete UUID selection.
+    /// </summary>
+    /// <param name="ids">The selected role IDs.</param>
+    /// <param name="cancellationToken">Cancels the lookup.</param>
+    /// <returns>The native role names, or a rejected invalid selection.</returns>
+    Task<string[]> ResolveRoleNamesAsync(Guid[] ids, CancellationToken cancellationToken);
 
     /// <summary>
     /// Checks current membership without treating token role claims as the database authority.

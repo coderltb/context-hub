@@ -576,12 +576,30 @@ public sealed class AuthenticationHttpTests
         using var reset = await client.GetAsync("/reset-password");
 
         Assert.Contains("href=\"/login\"", home);
-        Assert.Contains("href=\"/logout\"", home);
+        Assert.DoesNotContain("href=\"/logout\"", home);
         Assert.Contains("href=\"/forgot-password", login);
         Assert.DoesNotContain("/Identity/Account/", login);
         Assert.Equal(HttpStatusCode.Redirect, reset.StatusCode);
         Assert.Equal("/forgot-password", reset.Headers.Location!.AbsolutePath);
         Assert.Contains("ReturnUrl=", reset.Headers.Location.Query);
+    }
+
+    /// <summary>
+    /// Keeps resend on the same current email input and retains native antiforgery.
+    /// </summary>
+    /// <returns>The compiled recovery form assertions.</returns>
+    [Fact]
+    public async Task RecoveryResendPostsCurrentEmailWithAntiforgery()
+    {
+        await using var app = await CreateHostAsync();
+        using var client = app.GetTestClient();
+        var html = await client.GetStringAsync("/verify-password-reset-otp?email=owner%40example.test");
+
+        Assert.Contains("formaction=\"/forgot-password\"", html);
+        Assert.Contains("name=\"__RequestVerificationToken\"", html);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "<form "));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(html, "name=\"Input.Email\""));
+        Assert.Contains("autocomplete=\"one-time-code\"", html);
     }
 
     /// <summary>

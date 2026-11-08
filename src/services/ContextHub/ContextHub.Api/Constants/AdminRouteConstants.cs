@@ -93,12 +93,12 @@ public static class AdminRouteConstants
     /// <summary>
     /// Identifies the connection name route.
     /// </summary>
-    public const string CONNECTION_NAME = "{name}";
+    public const string CONNECTION_ID = "{connectionId}";
 
     /// <summary>
     /// Identifies the tool name route.
     /// </summary>
-    public const string TOOL_NAME = "{toolName}";
+    public const string TOOL_ID = "{toolId}";
 
     /// <summary>
     /// Identifies the recommendation id route.

@@ -7,6 +7,32 @@ namespace ContextHub.Infrastructure.Services.Mcp;
 public sealed class ToolStateService(IToolRepository toolRepository) : IToolStateService
 {
     /// <summary>
+    /// Reads one stored tool including both schemas, even when it is disabled.
+    /// </summary>
+    /// <param name="toolId">The immutable Owner-facing identity.</param>
+    /// <param name="cancellationToken">Cancels the database read.</param>
+    /// <returns>The current configuration.</returns>
+    public async Task<McpToolDetailResponseDto> GetAsync(Guid toolId, CancellationToken cancellationToken)
+    {
+        // Owner inspection must not inherit the consumer's enabled-only discovery filter.
+        var entity = await toolRepository.GetDetailAsync(toolId, cancellationToken)
+            ?? throw new BusinessException(
+                TelemetryErrorConstants.TOOL_NAME_INVALID,
+                "The requested tool was not found.",
+                BusinessErrorKind.NotFound);
+        var definition = ToolCatalogConstants.TOOLS.Single(value => value.Name == entity.Name);
+        var connections = await toolRepository.GetConnectionNamesAsync(cancellationToken);
+        var metadata = Project(entity.Adapt<ToolStateModel>(), definition, connections);
+
+        return entity.Adapt<McpToolDetailResponseDto>() with
+        {
+            Implementation = metadata.Implementation,
+            Resources = McpResourceConstants.DEFINITIONS.Where(value => value.ToolName == entity.Name)
+                .Select(value => new McpRelatedResourceResponseDto(value.Uri, value.Name)).ToArray()
+        };
+    }
+
+    /// <summary>
     /// Reads mutable contracts without substituting embedded defaults for missing authority.
     /// </summary>
     /// <param name="toolName">The selected name, or null for discovery.</param>
@@ -40,34 +66,39 @@ public sealed class ToolStateService(IToolRepository toolRepository) : IToolStat
     }
 
     /// <summary>
-    /// Returns all registered tools in their fixed order, including disabled entries.
+    /// Returns one database page independently of unpaged public tool discovery.
     /// </summary>
-    /// <param name="cancellationToken">Cancels state and routing metadata reads.</param>
-    /// <returns>The complete Owner projection.</returns>
-    public async Task<McpToolsResponseDto> GetListAsync(CancellationToken cancellationToken)
+    /// <param name="request">The Owner list filters.</param>
+    /// <param name="cancellationToken">Cancels provider reads.</param>
+    /// <returns>The safe metadata page.</returns>
+    public async Task<PageResponse<McpToolResponseDto>> GetListAsync(
+        GetMcpToolsRequestDto request,
+        CancellationToken cancellationToken)
     {
-        var states = await toolRepository.GetStatesAsync(cancellationToken);
-        RequireCompleteState(states);
+        var page = await toolRepository.GetPageAsync(request, cancellationToken);
+        var connections = page.Items.Count == 0 ? [] : await toolRepository.GetConnectionNamesAsync(cancellationToken);
+        var items = page.Items.Select(value => Project(
+            value,
+            ToolCatalogConstants.TOOLS.Single(tool => tool.Name == value.Name),
+            connections)).ToArray();
 
-        var connections = await toolRepository.GetConnectionNamesAsync(cancellationToken);
-        return new() { Items = ToolCatalogConstants.TOOLS.Select(definition => Project(states.Single(state => state.Name == definition.Name), definition, connections)).ToArray() };
+        return new(items, new PageRequest(page.Page, page.PageSize), page.TotalCount);
     }
 
     /// <summary>
-    /// Changes only one registered tool and returns its committed version.
+    /// Applies an Owner update to the exact registered tool UUID.
     /// </summary>
-    /// <param name="toolName">The fixed public name.</param>
-    /// <param name="request">The desired state and expected version.</param>
-    /// <param name="cancellationToken">Cancels persistence.</param>
-    /// <returns>The saved approved tool metadata.</returns>
+    /// <param name="toolId">The stored tool identity.</param>
+    /// <param name="request">The desired metadata, state and expected version.</param>
+    /// <param name="cancellationToken">Cancels persistence and routing metadata reads.</param>
+    /// <returns>The committed metadata without changing native handler identity.</returns>
     public async Task<McpToolResponseDto> UpdateAsync(
-        string toolName,
+        Guid toolId,
         UpdateMcpToolRequestDto request,
         CancellationToken cancellationToken)
     {
-        var definition = ToolCatalogConstants.TOOLS.SingleOrDefault(value => value.Name == toolName)
-            ?? throw new BusinessException(TelemetryErrorConstants.TOOL_NAME_INVALID, "The tool name is not registered.");
-        var entity = await toolRepository.SaveStateAsync(toolName, request, cancellationToken);
+        var entity = await toolRepository.SaveStateAsync(toolId, request, cancellationToken);
+        var definition = ToolCatalogConstants.TOOLS.Single(value => value.Name == entity.Name);
         var connections = await toolRepository.GetConnectionNamesAsync(cancellationToken);
         return Project(entity.Adapt<ToolStateModel>(), definition, connections);
     }

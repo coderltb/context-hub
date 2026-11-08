@@ -16,7 +16,7 @@ public sealed class CatalogMapping : IRegister
             .MapWith(source => source.DeepClone().AsObject());
 
         config.NewConfig<CreatePackageRequestDto, Package>()
-            .Map(destination => destination.Key, source => source.PackageId)
+            .Map(destination => destination.Key, source => source.Key)
             .Map(destination => destination.Type, source => source.PackageType)
             .Map(destination => destination.Name, source => source.DisplayName.Trim())
             .Map(destination => destination.Summary, source => source.Summary.Trim())
@@ -43,9 +43,20 @@ public sealed class CatalogMapping : IRegister
                 destination => destination.ConcurrencyVersion,
                 destination => destination.Versions);
 
-        config.NewConfig<CatalogSearchRowModel, CatalogSearchItemResponseDto>()
+        config.NewConfig<CatalogSearchRowModel, CatalogSearchItemModel>()
+            .Map(destination => destination.PackageId, source => source.Id)
+            .Map(destination => destination.Key, source => source.PackageId)
             .Map(destination => destination.PackageType, source => source.Type)
             .Map(destination => destination.DisplayName, source => source.Name);
+        config.NewConfig<CatalogSearchItemModel, AdminCatalogSearchItemResponseDto>();
+
+        config.NewConfig<CatalogSearchResultModel, AdminCatalogSearchResponseDto>();
+
+        config.NewConfig<CatalogSearchItemModel, CatalogSearchItemResponseDto>()
+            .Map(destination => destination.PackageId, source => source.Key);
+
+        config.NewConfig<CatalogSearchResultModel, CatalogSearchResponseDto>();
+
         config.NewConfig<Package, PackagePublicationStateModel>();
 
         config.NewConfig<PackageVersion, PackageVersionNumberModel>()
@@ -66,10 +77,12 @@ public sealed class CatalogMapping : IRegister
             .Map(destination => destination.Version, source => source.Number);
 
         config.NewConfig<PackageVersion, VersionSummaryResponseDto>()
+            .Map(destination => destination.Key, source => source.Package.Key)
             .Map(destination => destination.Version, source => source.Number);
 
         config.NewConfig<PackageVersion, VersionResponseDto>()
-            .Map(destination => destination.PackageId, source => source.Package.Key)
+            .Map(destination => destination.PackageId, source => source.PackageId)
+            .Map(destination => destination.Key, source => source.Package.Key)
             .Map(destination => destination.Version, source => source.Number)
             .Map(destination => destination.ConcurrencyToken, source => source.ConcurrencyVersion.ToString())
             .Map(
@@ -79,7 +92,7 @@ public sealed class CatalogMapping : IRegister
                 destination => destination.Bundle,
                 source => JsonNode.Parse(source.Bundle, null, default)!.AsObject());
         config.NewConfig<Package, PackageResponseDto>()
-            .Map(destination => destination.PackageId, source => source.Key)
+            .Map(destination => destination.PackageId, source => source.Id)
             .Map(destination => destination.PackageType, source => source.Type)
             .Map(destination => destination.DisplayName, source => source.Name)
             .Map(destination => destination.ConcurrencyToken, source => source.ConcurrencyVersion.ToString())

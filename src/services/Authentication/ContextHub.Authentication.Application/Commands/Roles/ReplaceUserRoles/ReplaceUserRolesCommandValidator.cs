@@ -13,11 +13,11 @@ public sealed class ReplaceUserRolesCommandValidator : AbstractValidator<Replace
         RuleFor(command => command.Request.ConcurrencyToken)
             .NotEmpty();
 
-        RuleFor(command => command.Request.RoleNames)
-            .NotNull();
+        RuleFor(command => command.Request.RoleIds)
+            .NotNull().Must(ids => ids is null || ids.Distinct().Count() == ids.Length);
 
         // Reject malformed elements before native role lookup; collection emptiness keeps its use-case meaning.
-        RuleForEach(command => command.Request.RoleNames)
+        RuleForEach(command => command.Request.RoleIds)
             .NotEmpty();
     }
 }

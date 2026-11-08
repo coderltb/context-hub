@@ -108,17 +108,17 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         await using (var context = CreateContext())
         {
             var service = CreateService(context);
-            await service.CreatePackageAsync(new() { PackageId = packageId, PackageType = "rule", DisplayName = "Review", Summary = "API review guidance." }, CancellationToken.None);
+            await service.CreatePackageAsync(new() { Key = packageId, PackageType = "rule", DisplayName = "Review", Summary = "API review guidance." }, CancellationToken.None);
             var first = AddSource(packageId, "1.9.0", '1');
-            var preview = await service.PreviewAsync(packageId, first, CancellationToken.None);
+            var preview = await service.PreviewAsync(await PackageIdAsync(packageId), first, CancellationToken.None);
             Assert.Equal("ready", preview.Readiness.Status);
             Assert.Equal(0, await context.Versions.CountAsync());
-            var original = await service.PublishAsync(packageId, first, CancellationToken.None);
-            var repeated = await service.PublishAsync(packageId, first, CancellationToken.None);
+            var original = await service.PublishAsync(await PackageIdAsync(packageId), first, CancellationToken.None);
+            var repeated = await service.PublishAsync(await PackageIdAsync(packageId), first, CancellationToken.None);
             Assert.Equal(original.ContentHash, repeated.ContentHash);
             Assert.Equal(original.PublishedAt, repeated.PublishedAt);
-            await service.PublishAsync(packageId, AddSource(packageId, "1.10.0", '2'), CancellationToken.None);
-            var page = await service.GetVersionsAsync(packageId, new() { Sort = "-version" }, CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(packageId), AddSource(packageId, "1.10.0", '2'), CancellationToken.None);
+            var page = await service.GetVersionsAsync(await PackageIdAsync(packageId), new() { Sort = "-version" }, CancellationToken.None);
             Assert.Equal(new[] { "1.10.0", "1.9.0" }, page.Items.Select(value => value.Version));
             var latest = await service.GetPublicPackageAsync(new() { PackageId = packageId }, CancellationToken.None);
             Assert.Equal("1.10.0", latest["version"]!.GetValue<string>());
@@ -130,9 +130,9 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         await using (var context = CreateContext())
         {
             var service = CreateService(context);
-            var current = await service.GetVersionAsync(packageId, "1.10.0", CancellationToken.None);
+            var current = await service.GetVersionAsync(await PackageIdAsync(packageId), "1.10.0", CancellationToken.None);
             Assert.Equal(current.PublishedAt, current.Manifest["published_at"]!.GetValue<DateTimeOffset>());
-            var revoked = await service.RevokeAsync(packageId, "1.10.0", new() { ConcurrencyToken = current.ConcurrencyToken }, CancellationToken.None);
+            var revoked = await service.RevokeAsync(await PackageIdAsync(packageId), "1.10.0", new() { ConcurrencyToken = current.ConcurrencyToken }, CancellationToken.None);
             Assert.Equal(current.ContentHash, revoked.ContentHash);
             Assert.True(JsonNode.DeepEquals(current.Manifest, revoked.Manifest));
             Assert.True(JsonNode.DeepEquals(current.Bundle, revoked.Bundle));
@@ -158,6 +158,52 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
     }
 
     /// <summary>
+    /// Keeps UUID parents, replacement selection and provider-side metadata pages independent of public catalog keys.
+    /// </summary>
+    /// <returns>The ownership, numeric ordering and replacement readback assertions.</returns>
+    [Fact]
+    public async Task OwnerVersionsAndReplacementRemainBoundToTheSelectedPackage()
+    {
+        await using var context = CreateContext();
+        var service = CreateService(context);
+        var package = await service.CreatePackageAsync(new()
+        {
+            Key = "contexthub.owner-identities", PackageType = "rule", DisplayName = "Owner identities", Summary = "Version selection."
+        }, CancellationToken.None);
+        var other = await service.CreatePackageAsync(new()
+        {
+            Key = "contexthub.other-identities", PackageType = "rule", DisplayName = "Other identities", Summary = "Another package."
+        }, CancellationToken.None);
+        var first = await service.PublishAsync(package.PackageId, AddSource(package.Key, "1.9.0", '1'), CancellationToken.None);
+        var replacement = await service.PublishAsync(package.PackageId, AddSource(package.Key, "1.10.0", '2'), CancellationToken.None);
+        var foreign = await service.PublishAsync(other.PackageId, AddSource(other.Key, "2.0.0", '3'), CancellationToken.None);
+        var missing = await Assert.ThrowsAsync<BusinessException>(() => service.GetVersionAsync(other.PackageId, first.Version, CancellationToken.None));
+        Assert.Equal(BusinessErrorKind.NotFound, missing.Kind);
+        foreach (var invalid in new[] { first.Version, foreign.Version })
+        {
+            var rejected = await Assert.ThrowsAsync<BusinessException>(() => service.DeprecateAsync(package.PackageId, first.Version,
+                new() { ReplacementVersion = invalid, ConcurrencyToken = first.ConcurrencyToken }, CancellationToken.None));
+            Assert.Equal("invalid_replacement", rejected.ErrorCode);
+        }
+        var deprecated = await service.DeprecateAsync(package.PackageId, first.Version,
+            new() { ReplacementVersion = replacement.Version, ConcurrencyToken = first.ConcurrencyToken }, CancellationToken.None);
+        Assert.Equal(replacement.Version, deprecated.ReplacementVersion);
+        var readback = await service.GetVersionAsync(package.PackageId, first.Version, CancellationToken.None);
+        Assert.Equal(replacement.Version, readback.ReplacementVersion);
+        var page = await service.GetVersionsAsync(package.PackageId, new() { PageSize = 1, Sort = "-version" }, CancellationToken.None);
+        Assert.Equal(2, page.TotalCount);
+        Assert.Equal(replacement.Version, Assert.Single(page.Items).Version);
+        var secondPage = await service.GetVersionsAsync(package.PackageId, new() { PageSize = 1, Page = 2, Sort = "-version" }, CancellationToken.None);
+        Assert.Equal(replacement.Version, Assert.Single(secondPage.Items).ReplacementVersion);
+        var published = await service.GetVersionsAsync(package.PackageId, new() { Status = "published" }, CancellationToken.None);
+        Assert.Equal(1, published.TotalCount);
+        Assert.Equal(replacement.Version, Assert.Single(published.Items).Version);
+        var publicResult = await service.GetPublicPackageAsync(new() { PackageId = package.Key }, CancellationToken.None);
+        Assert.Equal(package.Key, publicResult["package_id"]!.GetValue<string>());
+        Assert.Equal("1.10.0", publicResult["version"]!.GetValue<string>());
+    }
+
+    /// <summary>
     /// Orders dependencies before their consumer and refuses cached roots when a dependency becomes revoked.
     /// </summary>
     /// <returns>The graph, capability and live-state assertions.</returns>
@@ -171,11 +217,11 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
             var service = CreateService(context);
             foreach (var key in new[] { root, dependency })
             {
-                await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = key, Summary = "API review dependency." }, CancellationToken.None);
+                await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = key, Summary = "API review dependency." }, CancellationToken.None);
             }
 
-            await service.PublishAsync(dependency, AddSource(dependency, "1.0.0", '3'), CancellationToken.None);
-            await service.PublishAsync(root, AddSource(root, "1.0.0", '4', dependency), CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(dependency), AddSource(dependency, "1.0.0", '3'), CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(root), AddSource(root, "1.0.0", '4', dependency), CancellationToken.None);
             var resolved = await service.ResolveAsync(new() { PackageId = root }, CancellationToken.None);
             Assert.Equal(new[] { dependency, root }, resolved["packages"]!.AsArray().Select(value => value!["package_id"]!.GetValue<string>()));
             var compatibility = await service.CheckCompatibilityAsync(new() { PackageId = root, ClientCapabilities = [] }, CancellationToken.None);
@@ -189,8 +235,8 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         await using (var context = CreateContext())
         {
             var service = CreateService(context);
-            var current = await service.GetVersionAsync(dependency, "1.0.0", CancellationToken.None);
-            await service.RevokeAsync(dependency, "1.0.0", new() { ConcurrencyToken = current.ConcurrencyToken }, CancellationToken.None);
+            var current = await service.GetVersionAsync(await PackageIdAsync(dependency), "1.0.0", CancellationToken.None);
+            await service.RevokeAsync(await PackageIdAsync(dependency), "1.0.0", new() { ConcurrencyToken = current.ConcurrencyToken }, CancellationToken.None);
         }
 
         await using (var context = CreateContext())
@@ -212,24 +258,23 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         await using (var context = CreateContext())
         {
             var service = CreateService(context);
-            await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = "Original", Summary = "Initial metadata." }, CancellationToken.None);
-            await service.PublishAsync(key, AddSource(key, "1.0.0", '5'), CancellationToken.None);
+            await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = "Original", Summary = "Initial metadata." }, CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", '5'), CancellationToken.None);
         }
 
         await using var firstContext = CreateContext();
         await using var secondContext = CreateContext();
         var first = CreateService(firstContext);
         var second = CreateService(secondContext);
-        var snapshot = await first.GetPackageDetailAsync(key, CancellationToken.None);
-        await second.GetPackageDetailAsync(key, CancellationToken.None);
-        await first.UpdatePackageAsync(key, new() { DisplayName = "Saved", Summary = "Saved metadata.", IsActive = true, ConcurrencyToken = snapshot.ConcurrencyToken }, CancellationToken.None);
-        var conflict = await Assert.ThrowsAsync<BusinessException>(() => second.UpdatePackageAsync(key,
+        var snapshot = await first.GetPackageDetailAsync(await PackageIdAsync(key), CancellationToken.None);
+        await second.GetPackageDetailAsync(await PackageIdAsync(key), CancellationToken.None);
+        await first.UpdatePackageAsync(await PackageIdAsync(key), new() { DisplayName = "Saved", Summary = "Saved metadata.", IsActive = true, ConcurrencyToken = snapshot.ConcurrencyToken }, CancellationToken.None);
+        var conflict = await Assert.ThrowsAsync<BusinessException>(async () => await second.UpdatePackageAsync(await PackageIdAsync(key),
             new() { DisplayName = "Stale", Summary = "Stale metadata.", IsActive = true, ConcurrencyToken = snapshot.ConcurrencyToken }, CancellationToken.None));
         Assert.Equal(BusinessErrorKind.Conflict, conflict.Kind);
 
         await using var publishContext = CreateContext();
-        var publicationConflict = await Assert.ThrowsAsync<BusinessException>(() => CreateService(publishContext).PublishAsync(
-            key, AddSource(key, "1.0.0", '6'), CancellationToken.None));
+        var publicationConflict = await Assert.ThrowsAsync<BusinessException>(async () => await CreateService(publishContext).PublishAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", '6'), CancellationToken.None));
         Assert.Equal("version_conflict", publicationConflict.ErrorCode);
         await using var verify = CreateContext();
         Assert.Equal(1, await verify.Versions.CountAsync());
@@ -247,8 +292,8 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         var service = CreateService(context);
         foreach (var (key, digit) in new[] { ("contexthub.catalog-search-one", '7'), ("contexthub.catalog-search-two", '8') })
         {
-            await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = "API review", Summary = "Review API endpoints." }, CancellationToken.None);
-            await service.PublishAsync(key, AddSource(key, "1.0.0", digit), CancellationToken.None);
+            await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = "API review", Summary = "Review API endpoints." }, CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", digit), CancellationToken.None);
         }
 
         var page = await service.SearchAsync(new() { Query = "API review", Limit = 1 }, CancellationToken.None);
@@ -272,8 +317,8 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         const string key = "contexthub.catalog-cycle";
         await using var context = CreateContext();
         var service = CreateService(context);
-        await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = "Cycle", Summary = "Cycle review." }, CancellationToken.None);
-        var preview = await service.PreviewAsync(key, AddSource(key, "1.0.0", '9', key), CancellationToken.None);
+        await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = "Cycle", Summary = "Cycle review." }, CancellationToken.None);
+        var preview = await service.PreviewAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", '9', key), CancellationToken.None);
         Assert.Equal("blocked", preview.Readiness.Status);
         Assert.Contains(preview.Readiness.Findings, value => value.Code == "dependency_cycle");
         Assert.Equal(0, await context.Versions.CountAsync());
@@ -294,7 +339,7 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         {
             await CreateService(context).CreatePackageAsync(new()
             {
-                PackageId = key, PackageType = "rule", DisplayName = "Parallel review", Summary = "Concurrent publication review."
+                Key = key, PackageType = "rule", DisplayName = "Parallel review", Summary = "Concurrent publication review."
             }, CancellationToken.None);
         }
 
@@ -326,7 +371,7 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         Assert.Contains(release.SourceCommitSha, new[] { firstRequest.SourceCommitSha, secondRequest.SourceCommitSha });
 
         async Task<Exception?> PublishAsync(ContextHubDbContext context, PublishVersionRequestDto request) =>
-            await Record.ExceptionAsync(() => CreateService(context).PublishAsync(key, request, CancellationToken.None));
+            await Record.ExceptionAsync(async () => await CreateService(context).PublishAsync(await PackageIdAsync(key), request, CancellationToken.None));
     }
 
     /// <summary>
@@ -352,8 +397,8 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         await using (var context = CreateContext())
         {
             var service = CreateService(context, cacheService);
-            await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = "Cached review", Summary = "Cache outage review." }, CancellationToken.None);
-            await service.PublishAsync(key, AddSource(key, "1.0.0", 'c'), CancellationToken.None);
+            await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = "Cached review", Summary = "Cache outage review." }, CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", 'c'), CancellationToken.None);
             Assert.Equal("1.0.0", (await service.GetPublicPackageAsync(new() { PackageId = key }, CancellationToken.None))["version"]!.GetValue<string>());
         }
 
@@ -363,8 +408,8 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
             var service = CreateService(context, cacheService);
             var result = await service.GetPublicPackageAsync(new() { PackageId = key }, CancellationToken.None);
             Assert.Equal("1.0.0", result["version"]!.GetValue<string>());
-            var current = await service.GetVersionAsync(key, "1.0.0", CancellationToken.None);
-            await service.RevokeAsync(key, "1.0.0", new() { ConcurrencyToken = current.ConcurrencyToken }, CancellationToken.None);
+            var current = await service.GetVersionAsync(await PackageIdAsync(key), "1.0.0", CancellationToken.None);
+            await service.RevokeAsync(await PackageIdAsync(key), "1.0.0", new() { ConcurrencyToken = current.ConcurrencyToken }, CancellationToken.None);
         }
 
         await using (var context = CreateContext())
@@ -387,10 +432,10 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         var service = CreateService(context, embeddingService: new MetadataEmbedding());
         var package = await service.CreatePackageAsync(new()
         {
-            PackageId = key, PackageType = "rule", DisplayName = "AlphaUnique", Summary = "AlphaUnique instructions."
+            Key = key, PackageType = "rule", DisplayName = "AlphaUnique", Summary = "AlphaUnique instructions."
         }, CancellationToken.None);
-        var published = await service.PublishAsync(key, AddSource(key, "1.0.0", 'd'), CancellationToken.None);
-        var updated = await service.UpdatePackageAsync(key, new()
+        var published = await service.PublishAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", 'd'), CancellationToken.None);
+        var updated = await service.UpdatePackageAsync(await PackageIdAsync(key), new()
         {
             DisplayName = "BetaUnique", Summary = "BetaUnique instructions.", IsActive = true,
             ConcurrencyToken = package.ConcurrencyToken
@@ -423,24 +468,23 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
             var service = CreateService(setup);
             await service.CreatePackageAsync(new()
             {
-                PackageId = key, PackageType = "rule", DisplayName = "AlphaUnique", Summary = "AlphaUnique instructions."
+                Key = key, PackageType = "rule", DisplayName = "AlphaUnique", Summary = "AlphaUnique instructions."
             }, CancellationToken.None);
-            await service.PublishAsync(key, AddSource(key, "1.0.0", 'e'), CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", 'e'), CancellationToken.None);
         }
 
         var barrier = new PackageUpdateBarrier();
         await using var metadataContext = CreateContext(barrier);
         var metadataService = CreateService(metadataContext);
-        var current = await metadataService.GetPackageDetailAsync(key, CancellationToken.None);
-        var rename = Record.ExceptionAsync(() => metadataService.UpdatePackageAsync(key, new()
+        var current = await metadataService.GetPackageDetailAsync(await PackageIdAsync(key), CancellationToken.None);
+        var rename = Record.ExceptionAsync(async () => await metadataService.UpdatePackageAsync(await PackageIdAsync(key), new()
         {
             DisplayName = "BetaUnique", Summary = "BetaUnique instructions.", IsActive = true,
             ConcurrencyToken = current.ConcurrencyToken
         }, CancellationToken.None));
         await barrier.Arrived.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await using var publishContext = CreateContext();
-        var publicationFailure = await Record.ExceptionAsync(() => CreateService(publishContext).PublishAsync(
-            key, AddSource(key, "1.1.0", 'f'), CancellationToken.None));
+        var publicationFailure = await Record.ExceptionAsync(async () => await CreateService(publishContext).PublishAsync(await PackageIdAsync(key), AddSource(key, "1.1.0", 'f'), CancellationToken.None));
         barrier.Release.TrySetResult();
         var renameFailure = await rename;
         Assert.True(renameFailure is BusinessException || publicationFailure is BusinessException,
@@ -462,8 +506,8 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         await using (var setup = CreateContext())
         {
             var service = CreateService(setup);
-            await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = "Availability", Summary = "Availability review." }, CancellationToken.None);
-            await service.PublishAsync(key, AddSource(key, "1.0.0", '1'), CancellationToken.None);
+            await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = "Availability", Summary = "Availability review." }, CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(key), AddSource(key, "1.0.0", '1'), CancellationToken.None);
             await service.GetPublicPackageAsync(new() { PackageId = key }, CancellationToken.None);
         }
 
@@ -471,8 +515,8 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         Func<ICatalogService, Task>[] operations =
         [
             service => service.GetPackagesAsync(new(), CancellationToken.None),
-            service => service.GetPackageDetailAsync(key, CancellationToken.None),
-            service => service.GetVersionsAsync(key, new(), CancellationToken.None),
+            async service => await service.GetPackageDetailAsync(await PackageIdAsync(key), CancellationToken.None),
+            async service => await service.GetVersionsAsync(await PackageIdAsync(key), new(), CancellationToken.None),
             service => service.SearchAsync(new() { Query = "availability" }, CancellationToken.None),
             service => service.GetPublicPackageAsync(new() { PackageId = key }, CancellationToken.None),
             service => service.GetRevocationsAsync(new() { PackageId = key }, CancellationToken.None),
@@ -563,17 +607,17 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         const string key = "contexthub.catalog-secret-review";
         await using var context = CreateContext();
         var service = CreateService(context);
-        await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = "Credential review", Summary = "Guidance review." }, CancellationToken.None);
+        await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = "Credential review", Summary = "Guidance review." }, CancellationToken.None);
         var request = AddSource(key, "1.0.0", '2');
         var source = _sourceReader.Sources[(key, request.SourceCommitSha)];
         var bundle = JsonNode.Parse(source.BundleJson)!.AsObject();
         bundle["instructions"] = instructions;
         _sourceReader.Sources[(key, request.SourceCommitSha)] = source with { BundleJson = bundle.ToJsonString() };
-        var preview = await service.PreviewAsync(key, request, CancellationToken.None);
+        var preview = await service.PreviewAsync(await PackageIdAsync(key), request, CancellationToken.None);
         if (permitted)
         {
             Assert.Equal("ready", preview.Readiness.Status);
-            var published = await service.PublishAsync(key, request, CancellationToken.None);
+            var published = await service.PublishAsync(await PackageIdAsync(key), request, CancellationToken.None);
             Assert.Equal(instructions, published.Bundle["instructions"]!.GetValue<string>());
         }
         else
@@ -583,7 +627,7 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
             Assert.Contains(preview.Readiness.Findings, value => value.Code == "credentials_in_source");
             Assert.DoesNotContain("live-secret-value", JsonSerializer.Serialize(preview));
             Assert.DoesNotContain("live-provider-secret", JsonSerializer.Serialize(preview));
-            await Assert.ThrowsAsync<BusinessException>(() => service.PublishAsync(key, request, CancellationToken.None));
+            await Assert.ThrowsAsync<BusinessException>(async () => await service.PublishAsync(await PackageIdAsync(key), request, CancellationToken.None));
             Assert.Equal(0, await context.Versions.CountAsync());
         }
     }
@@ -599,19 +643,19 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         using var rsa = RSA.Create(2048);
         await using var context = CreateContext();
         var service = CreateService(context);
-        await service.CreatePackageAsync(new() { PackageId = key, PackageType = "rule", DisplayName = "PEM review", Summary = "PEM guidance review." }, CancellationToken.None);
+        await service.CreatePackageAsync(new() { Key = key, PackageType = "rule", DisplayName = "PEM review", Summary = "PEM guidance review." }, CancellationToken.None);
         var request = AddSource(key, "1.0.0", '3');
         var source = _sourceReader.Sources[(key, request.SourceCommitSha)];
         var bundle = JsonNode.Parse(source.BundleJson)!.AsObject();
         bundle["instructions"] = rsa.ExportPkcs8PrivateKeyPem();
         _sourceReader.Sources[(key, request.SourceCommitSha)] = source with { BundleJson = bundle.ToJsonString() };
-        var preview = await service.PreviewAsync(key, request, CancellationToken.None);
+        var preview = await service.PreviewAsync(await PackageIdAsync(key), request, CancellationToken.None);
         Assert.Null(preview.PublicPreview);
         Assert.Null(preview.Readiness.CandidateContentHash);
-        await Assert.ThrowsAsync<BusinessException>(() => service.PublishAsync(key, request, CancellationToken.None));
+        await Assert.ThrowsAsync<BusinessException>(async () => await service.PublishAsync(await PackageIdAsync(key), request, CancellationToken.None));
         bundle["instructions"] = rsa.ExportSubjectPublicKeyInfoPem();
         _sourceReader.Sources[(key, request.SourceCommitSha)] = source with { BundleJson = bundle.ToJsonString() };
-        Assert.Equal("ready", (await service.PreviewAsync(key, request, CancellationToken.None)).Readiness.Status);
+        Assert.Equal("ready", (await service.PreviewAsync(await PackageIdAsync(key), request, CancellationToken.None)).Readiness.Status);
     }
 
     /// <summary>
@@ -638,16 +682,16 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
             var kind = manifest["package_type"]!.GetValue<string>();
             var file = kind == "rule" ? "read-only-review-rule.bundle.json" : "dotnet-api-review-" + kind + ".bundle.json";
             var commit = manifest["authoring_source"]!["commit"]!.GetValue<string>();
-            await service.CreatePackageAsync(new() { PackageId = key, PackageType = kind, DisplayName = "Documented review package", Summary = "Evidence-based review guidance." }, CancellationToken.None);
+            await service.CreatePackageAsync(new() { Key = key, PackageType = kind, DisplayName = "Documented review package", Summary = "Evidence-based review guidance." }, CancellationToken.None);
             _sourceReader.Sources[(key, commit)] = new(manifest.ToJsonString(), File.ReadAllText(Path.Combine(root, file)), commit);
             var request = new PublishVersionRequestDto
             {
                 Version = manifest["version"]!.GetValue<string>(), AuthoringRepository = manifest["authoring_source"]!["repository"]!.GetValue<string>(),
                 SourceCommitSha = commit, SourcePath = "packages/documented-review"
             };
-            var preview = await service.PreviewAsync(key, request, CancellationToken.None);
+            var preview = await service.PreviewAsync(await PackageIdAsync(key), request, CancellationToken.None);
             Assert.True(preview.Readiness.Status == "ready", key + ": " + JsonSerializer.Serialize(preview.Readiness));
-            await service.PublishAsync(key, request, CancellationToken.None);
+            await service.PublishAsync(await PackageIdAsync(key), request, CancellationToken.None);
         }
 
         Assert.Equal(4, await context.Versions.CountAsync());
@@ -683,10 +727,10 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
                 Version = "1.1.0", AuthoringRepository = manifest["authoring_source"]!["repository"]!.GetValue<string>(),
                 SourceCommitSha = candidateCommit, SourcePath = "packages/documented-review"
             };
-            var preview = await service.PreviewAsync(workflowKey, request, CancellationToken.None);
+            var preview = await service.PreviewAsync(await PackageIdAsync(workflowKey), request, CancellationToken.None);
             Assert.Equal("blocked", preview.Readiness.Status);
             Assert.Contains(preview.Readiness.Findings, finding => finding.Code == "dependency_missing");
-            var failure = await Assert.ThrowsAsync<BusinessException>(() => service.PublishAsync(workflowKey, request, CancellationToken.None));
+            var failure = await Assert.ThrowsAsync<BusinessException>(async () => await service.PublishAsync(await PackageIdAsync(workflowKey), request, CancellationToken.None));
             Assert.Equal("dependency_missing", failure.ErrorCode);
         }
     }
@@ -827,4 +871,19 @@ public sealed class CatalogPostgreSqlTests : IAsyncLifetime
         public Task<EmbeddingResultModel?> EncodeQueryAsync(string text, CancellationToken cancellationToken) => Task.FromResult<EmbeddingResultModel?>(null);
         public Task<EmbeddingResultModel?> EncodePassageAsync(string text, CancellationToken cancellationToken) => Task.FromResult<EmbeddingResultModel?>(null);
     }
+    private readonly Dictionary<string, Guid> _packageIds = new(StringComparer.Ordinal);
+
+    private async Task<Guid> PackageIdAsync(string key)
+    {
+        if (_packageIds.TryGetValue(key, out var id))
+        {
+            return id;
+        }
+        await using var connection = await _dataSource.OpenConnectionAsync();
+        id = await connection.ExecuteScalarAsync<Guid>("SELECT \"Id\" FROM catalog.\"Package\" WHERE \"Key\"=@key", new { key });
+        _packageIds[key] = id;
+
+        return id;
+    }
+
 }

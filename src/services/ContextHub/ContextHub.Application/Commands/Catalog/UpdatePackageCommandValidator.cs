@@ -10,7 +10,7 @@ public sealed class UpdatePackageCommandValidator : AbstractValidator<UpdatePack
     /// </summary>
     public UpdatePackageCommandValidator()
     {
-        RuleFor(value => value.PackageId).NotEmpty().MaximumLength(128).Matches(CatalogConstants.PACKAGE_ID_PATTERN);
+        RuleFor(value => value.PackageId).NotEmpty();
 
         RuleFor(value => value.Request).NotNull().SetValidator(new UpdatePackageRequestDtoValidator());
     }

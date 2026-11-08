@@ -49,9 +49,15 @@ public sealed class IntegrationMapping : IRegister
             .Map(destination => destination.ConcurrencyToken, source => source.ConcurrencyVersion.ToString());
 
         config.NewConfig<ExternalMcp, ExternalMcpResponseDto>()
+            .Map(destination => destination.ConnectionId, source => source.Id)
+            .Map(
+                destination => destination.Status,
+                source => source.Status == ExternalMcpStatus.Active ? IntegrationConstants.ACTIVE : IntegrationConstants.DELETED)
             .Map(
                 destination => destination.Config,
-                source => JsonSerializer.Deserialize<ExternalMcpConfigDto>(source.Config, IntegrationJsonOptions.CANONICAL)!)
+                source => JsonSerializer.Deserialize<ExternalMcpConfigDto>(
+                    source.Config,
+                    IntegrationJsonOptions.CANONICAL)!)
             .Map(destination => destination.ConcurrencyToken, source => source.ConcurrencyVersion.ToString());
     }
 }

@@ -23,7 +23,7 @@ public sealed class AuthenticationRegistrationTests
         {
             // A valid role must not hide an invalid element later in the submitted collection.
             var invitation = new InviteUserCommand(new("invited", "invited@example.test", ["Owner", role!]));
-            var replacement = new ReplaceUserRolesCommand(Guid.NewGuid(), new(["Owner", role!], "version"));
+            var replacement = new ReplaceUserRolesCommand(Guid.NewGuid(), new([Guid.NewGuid(), Guid.Empty], "version"));
             Assert.False((await invitationValidator.ValidateAsync(invitation)).IsValid);
             Assert.False((await replacementValidator.ValidateAsync(replacement)).IsValid);
         }

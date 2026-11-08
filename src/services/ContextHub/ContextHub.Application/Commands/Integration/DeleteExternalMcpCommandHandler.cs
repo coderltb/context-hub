@@ -16,5 +16,8 @@ public sealed class DeleteExternalMcpCommandHandler(IExternalMcpService external
     public async ValueTask<ApiResponse<DeletedIntegrationResponseDto>> Handle(
         DeleteExternalMcpCommand request,
         CancellationToken cancellationToken) =>
-        new(await externalMcpService.DeleteAsync(request.Name, request.ConcurrencyToken, cancellationToken));
+        new(await externalMcpService.DeleteAsync(
+            request.ConnectionId,
+            request.ConcurrencyToken,
+            cancellationToken));
 }

@@ -10,6 +10,8 @@ public sealed class SaveExternalMcpCommandValidator : AbstractValidator<SaveExte
     /// </summary>
     public SaveExternalMcpCommandValidator()
     {
-        RuleFor(value => value.Name).NotEmpty().MaximumLength(120);
+        RuleFor(value => value.ConnectionId).NotEmpty();
+        RuleFor(value => value.Request.Name).NotEmpty().MaximumLength(120);
+        RuleFor(value => value.Request.ConcurrencyToken).NotEmpty().Must(value => uint.TryParse(value, out _));
     }
 }

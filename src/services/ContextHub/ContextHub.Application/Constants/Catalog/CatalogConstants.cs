@@ -76,6 +76,37 @@ public static class CatalogConstants
     public const string REVOKED = "revoked";
 
     /// <summary>
+    /// Orders packages by their public catalog key.
+    /// </summary>
+    public const string PACKAGE_KEY_SORT = "key";
+
+    /// <summary>
+    /// Orders packages by descending catalog key.
+    /// </summary>
+    public const string PACKAGE_KEY_DESCENDING_SORT = "-key";
+
+    /// <summary>
+    /// Orders packages by their display label.
+    /// </summary>
+    public const string PACKAGE_DISPLAY_NAME_SORT = "displayName";
+
+    /// <summary>
+    /// Orders recently modified packages first.
+    /// </summary>
+    public const string UPDATED_AT_DESCENDING_SORT = "-updatedAt";
+
+    /// <summary>
+    /// Orders newly published versions first.
+    /// </summary>
+    public const string PUBLISHED_AT_DESCENDING_SORT = "-publishedAt";
+
+    /// <summary>
+    /// Lists the accepted package ordering values once for binding and persistence.
+    /// </summary>
+    public static readonly string[] PACKAGE_SORTS =
+        [PACKAGE_KEY_SORT, PACKAGE_KEY_DESCENDING_SORT, PACKAGE_DISPLAY_NAME_SORT, UPDATED_AT_DESCENDING_SORT];
+
+    /// <summary>
     /// Names the version sort catalog value.
     /// </summary>
     public const string VERSION_SORT = "version";
@@ -89,6 +120,12 @@ public static class CatalogConstants
     /// Names the published at sort catalog value.
     /// </summary>
     public const string PUBLISHED_AT_SORT = "publishedAt";
+
+    /// <summary>
+    /// Lists accepted release ordering values without allocating a new allowlist for each request.
+    /// </summary>
+    public static readonly string[] VERSION_SORTS =
+        [VERSION_SORT, VERSION_DESCENDING_SORT, PUBLISHED_AT_SORT, PUBLISHED_AT_DESCENDING_SORT];
 
     /// <summary>
     /// Lists the V1 package kinds.

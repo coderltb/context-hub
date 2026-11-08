@@ -13,6 +13,11 @@ public sealed class ExternalMcpConfiguration : IEntityTypeConfiguration<External
     {
         builder.ToTable("ExternalMcp", "integration");
         builder.HasKey(value => value.Id);
+        builder.Property(value => value.Status).HasColumnType("text").IsRequired()
+            .HasConversion(value => value == ExternalMcpStatus.Active ? IntegrationConstants.ACTIVE : IntegrationConstants.DELETED,
+                value => value == IntegrationConstants.ACTIVE ? ExternalMcpStatus.Active : ExternalMcpStatus.Deleted)
+            .HasDefaultValue(ExternalMcpStatus.Active);
+
         builder.Property(value => value.CreatedAt).IsRequired();
         builder.Property(value => value.UpdatedAt).IsRequired();
         builder.Property(value => value.CreatedBy).IsRequired();
